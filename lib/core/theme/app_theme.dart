@@ -1,91 +1,124 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter/services.dart';
+import 'app_colors.dart';
+import 'app_typography.dart';
 
 class AppTheme {
-  // Brand colors from the landing page ref
-  static const Color primaryGold = Color(0xFFEBA352); // The golden/amber accent
-  static const Color primaryGoldDark = Color(0xFFA16D31);
-  static const Color accentBlue = Color(0xFF4A90E2); // Small blue accents on the hardware
-  
-  static const Color successGreen = Color(0xFF4CAF50);
-  
-  // Base background 
-  static const Color backgroundBase = Color(0xFF09090B); // Very deep almost black
-  static const Color surfaceBase = Color(0xFF121215); // Slightly elevated dark
-  static const Color surfaceElevated = Color(0xFF1A1A1E); // More elevated
-  
-  // Restored properties for legacy components
-  static const Color primaryStatusOn = successGreen;
-  static const Color primaryStatusOff = Color(0xFFE53935);
-  static const Color energyHigh = Color(0xFFFF5252);
-  static const Color shadowDark = Colors.black;
-  static const Color shadowLight = Colors.white12;
-  static const List<BoxShadow> skeuomorphicOutset = [];
-  
-  // Text colors
-  static const Color textHighEmphasis = Color(0xFFFFFFFF);
-  static const Color textMediumEmphasis = Color(0xFFA0A0A5);
-  static const Color textLowEmphasis = Color(0xFF6B6B70);
+  AppTheme._();
 
-  static ThemeData get darkTheme {
-    return ThemeData(
-      brightness: Brightness.dark,
-      scaffoldBackgroundColor: backgroundBase,
-      primaryColor: primaryGold,
-      colorScheme: const ColorScheme.dark(
-        primary: primaryGold,
-        secondary: accentBlue,
-        surface: surfaceBase,
-      ),
-      textTheme: GoogleFonts.outfitTextTheme(
-        ThemeData.dark().textTheme
-      ).copyWith(
-        displayLarge: GoogleFonts.outfit(fontSize: 48, fontWeight: FontWeight.w700, color: textHighEmphasis, letterSpacing: -1),
-        headlineLarge: GoogleFonts.outfit(fontSize: 32, fontWeight: FontWeight.w600, color: textHighEmphasis, letterSpacing: -0.5),
-        headlineMedium: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.w500, color: textHighEmphasis),
-        titleMedium: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w500, color: textHighEmphasis),
-        bodyLarge: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w400, color: textMediumEmphasis),
-        bodyMedium: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w400, color: textMediumEmphasis),
-      ),
-      dividerColor: Colors.white.withOpacity(0.05),
-    );
-  }
-
-  // Sleek Premium Decorations (Flat with subtle glowing borders instead of heavy skeuomorphic)
-  static BoxDecoration get panelDecoration {
-    return BoxDecoration(
-      color: surfaceBase,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: Colors.white.withOpacity(0.05), width: 1),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.5),
-          offset: const Offset(0, 10),
-          blurRadius: 20,
-        )
-      ]
-    );
-  }
-
-  // Golden Glow Decoration
-  static BoxDecoration get activePanelDecoration {
-    return BoxDecoration(
-      color: surfaceElevated,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: primaryGold.withOpacity(0.3), width: 1),
-      boxShadow: [
-        BoxShadow(
-          color: primaryGold.withOpacity(0.1),
-          offset: const Offset(0, 0),
-          blurRadius: 15,
-          spreadRadius: 2,
+  static ThemeData get dark => ThemeData(
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: AppColors.background,
+        colorScheme: const ColorScheme.dark(
+          primary: AppColors.primary,
+          secondary: AppColors.accent,
+          surface: AppColors.surface,
+          error: AppColors.warning,
+          onPrimary: AppColors.background,
+          onSecondary: AppColors.background,
+          onSurface: AppColors.textPrimary,
+          onError: Colors.white,
         ),
-        BoxShadow(
-          color: Colors.black.withOpacity(0.8),
-          offset: const Offset(0, 10),
-          blurRadius: 20,
-        )
-      ]
-    );
-  }
+        textTheme: TextTheme(
+          displayLarge: AppTypography.displayLarge,
+          displayMedium: AppTypography.displayMedium,
+          displaySmall: AppTypography.displaySmall,
+          bodyLarge: AppTypography.bodyLarge,
+          bodyMedium: AppTypography.bodyMedium,
+          bodySmall: AppTypography.bodySmall,
+          labelLarge: AppTypography.labelLarge,
+          labelSmall: AppTypography.labelSmall,
+        ),
+        appBarTheme: AppBarTheme(
+          backgroundColor: AppColors.surface,
+          foregroundColor: AppColors.textPrimary,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          titleTextStyle: AppTypography.orbitron(fontSize: 18, fontWeight: FontWeight.w700),
+          systemOverlayStyle: const SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Brightness.light,
+          ),
+        ),
+        bottomSheetTheme: const BottomSheetThemeData(
+          backgroundColor: AppColors.surface,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+        ),
+        cardTheme: const CardThemeData(
+          color: AppColors.panel,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(12)),
+            side: BorderSide(color: AppColors.border, width: 1),
+          ),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: AppColors.raised,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: AppColors.border),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: AppColors.border),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+          ),
+          hintStyle: AppTypography.exo(color: AppColors.textMuted),
+          labelStyle: AppTypography.exo(color: AppColors.textSecondary),
+        ),
+        snackBarTheme: SnackBarThemeData(
+          backgroundColor: AppColors.raised,
+          contentTextStyle: AppTypography.exo(color: AppColors.textPrimary),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+        dialogTheme: DialogThemeData(
+          backgroundColor: AppColors.surface,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: AppColors.border),
+          ),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            foregroundColor: AppColors.background,
+            textStyle: AppTypography.exo(fontSize: 14, fontWeight: FontWeight.w600),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            elevation: 0,
+          ),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppColors.primary,
+            side: const BorderSide(color: AppColors.primary),
+            textStyle: AppTypography.exo(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.primary),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          ),
+        ),
+        textButtonTheme: TextButtonThemeData(
+          style: TextButton.styleFrom(
+            foregroundColor: AppColors.primary,
+            textStyle: AppTypography.exo(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary),
+          ),
+        ),
+        dividerTheme: const DividerThemeData(color: AppColors.border, thickness: 1, space: 0),
+        iconTheme: const IconThemeData(color: AppColors.textSecondary, size: 20),
+        floatingActionButtonTheme: const FloatingActionButtonThemeData(
+          backgroundColor: AppColors.primary,
+          foregroundColor: AppColors.background,
+          elevation: 0,
+        ),
+      );
 }
