@@ -83,8 +83,8 @@ class _MetallicToggleState extends State<MetallicToggle>
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  const Color(0xFF080C14),
-                  const Color(0xFF0E1626),
+                  AppColors.background,
+                  AppColors.surface,
                 ],
               ),
               border: Border.all(
@@ -130,13 +130,12 @@ class _MetallicToggleState extends State<MetallicToggle>
                     height: thumbSize,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      gradient: const LinearGradient(
+                      gradient: LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                         colors: [
-                          Color(0xFF2E3E58),
-                          Color(0xFF1A2436),
-                          Color(0xFF0F1828),
+                          AppColors.textSecondary.withValues(alpha: 0.2),
+                          AppColors.surface,
                         ],
                       ),
                       border: Border.all(

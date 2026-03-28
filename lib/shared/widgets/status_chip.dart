@@ -112,7 +112,7 @@ class _StatusChipState extends State<StatusChip> with SingleTickerProviderStateM
           const SizedBox(width: 6),
           Text(
             widget.label,
-            style: AppTypography.exo(fontSize: 11, fontWeight: FontWeight.w600, color: _dotColor),
+            style: AppTypography.inter(fontSize: 11, fontWeight: FontWeight.w700, color: _dotColor),
           ),
         ],
       ),

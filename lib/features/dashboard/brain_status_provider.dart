@@ -4,7 +4,7 @@ import '../../core/network/dio_client.dart';
 import '../../core/network/api_endpoints.dart';
 import '../../core/network/websocket_service.dart';
 import '../../core/storage/secure_storage.dart';
-import '../../models/brain_status.dart';
+import '../../shared/models/brain_status.dart';
 
 class BrainStatusNotifier extends AsyncNotifier<BrainStatus> {
   Timer? _pollTimer;

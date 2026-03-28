@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
-import '../../models/automation.dart';
+import '../../shared/models/automation.dart';
 import '../../shared/widgets/nest_panel.dart';
+import '../../shared/widgets/glass_panel.dart';
 import '../../features/hub/widgets/metallic_toggle.dart';
 import 'automations_provider.dart';
 
@@ -17,37 +18,38 @@ class AutomationsScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       floatingActionButton: FloatingActionButton(
+        elevation: 0,
+        highlightElevation: 0,
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.background,
         onPressed: () => _showNewAutomationSheet(context, ref),
-        child: Container(
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.3),
-                blurRadius: 16,
-                spreadRadius: 2,
-              ),
-            ],
-          ),
-          child: const Icon(Icons.add_rounded),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: const Icon(Icons.add_rounded, size: 28),
       ),
       body: automationsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
-        error: (e, _) => Center(child: Text('Failed to load automations', style: AppTypography.bodySmall)),
+        error: (e, _) => Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline_rounded, color: AppColors.warning, size: 40),
+              const SizedBox(height: 16),
+              Text('Sync failed', style: AppTypography.displaySmall),
+              TextButton(onPressed: () => ref.refresh(automationsProvider), child: const Text('Retry')),
+            ],
+          ),
+        ),
         data: (automations) {
           if (automations.isEmpty) {
             return Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.flash_on_rounded, size: 56, color: AppColors.textMuted),
-                  const SizedBox(height: 16),
-                  Text('No automations yet', style: AppTypography.exo(fontSize: 18, fontWeight: FontWeight.w600)),
+                  Icon(Icons.auto_awesome_rounded, size: 64, color: AppColors.textMuted.withValues(alpha: 0.5)),
+                  const SizedBox(height: 24),
+                  Text('No Flows Yet', style: AppTypography.displayMedium),
                   const SizedBox(height: 8),
-                  Text('Tap + to create your first automation', style: AppTypography.bodySmall),
+                  Text('Automate your home with smart logic.', style: AppTypography.bodySmall),
                 ],
               ),
             );
@@ -57,7 +59,7 @@ class AutomationsScreen extends ConsumerWidget {
             backgroundColor: AppColors.surface,
             onRefresh: () => ref.read(automationsProvider.notifier).refresh(),
             child: ListView.builder(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               itemCount: automations.length,
               itemBuilder: (_, i) => Padding(
                 padding: const EdgeInsets.only(bottom: 12),
@@ -87,7 +89,7 @@ class AutomationsScreen extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(automation.name, style: AppTypography.orbitron(fontSize: 18)),
+            Text(automation.name, style: AppTypography.displayMedium),
             const SizedBox(height: 8),
             Text('Trigger: ${automation.triggerDescription}', style: AppTypography.bodySmall),
             const SizedBox(height: 6),
@@ -147,37 +149,35 @@ class _AutomationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isTimeBased = automation.trigger.type == 'time';
-    return NestPanel(
-      glowColor: automation.enabled ? AppColors.primary : null,
+    return GlassPanel(
+      padding: EdgeInsets.zero,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
           child: Row(
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
-                  color: automation.enabled ? AppColors.primary.withValues(alpha: 0.1) : AppColors.raised,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: automation.enabled ? AppColors.primary.withValues(alpha: 0.3) : AppColors.border),
+                  color: automation.enabled ? AppColors.primary.withValues(alpha: 0.1) : AppColors.raised.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(
                   isTimeBased ? Icons.schedule_rounded : Icons.bolt_rounded,
-                  size: 22,
+                  size: 24,
                   color: automation.enabled ? AppColors.primary : AppColors.textMuted,
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(automation.name, style: AppTypography.exo(fontSize: 15, fontWeight: FontWeight.w600)),
+                    Text(automation.name, style: AppTypography.bodyLarge.copyWith(fontWeight: FontWeight.w700)),
                     const SizedBox(height: 4),
-                    Text(automation.triggerDescription, style: AppTypography.bodySmall),
+                    Text(automation.triggerDescription, style: AppTypography.bodySmall.copyWith(fontSize: 11)),
                   ],
                 ),
               ),
@@ -248,7 +248,7 @@ class _NewAutomationSheetState extends State<_NewAutomationSheet> {
           const SizedBox(height: 20),
 
           if (_step == 0) ...[
-            Text('Step 1: Choose Trigger', style: AppTypography.orbitron(fontSize: 14)),
+            Text('Step 1: Choose Trigger', style: AppTypography.displaySmall),
             const SizedBox(height: 16),
             _OptionTile(title: 'Time-based', subtitle: 'Runs at a specific time', icon: Icons.schedule_rounded, selected: _triggerType == 'time', onTap: () => setState(() => _triggerType = 'time')),
             const SizedBox(height: 8),
@@ -266,7 +266,7 @@ class _NewAutomationSheetState extends State<_NewAutomationSheet> {
           ],
 
           if (_step == 1) ...[
-            Text('Step 2: Choose Action', style: AppTypography.orbitron(fontSize: 14)),
+            Text('Step 2: Choose Action', style: AppTypography.displaySmall),
             const SizedBox(height: 16),
             _OptionTile(title: 'Device Command', subtitle: 'Turn a device on or off', icon: Icons.power_settings_new_rounded, selected: _actionType == 'device_command', onTap: () => setState(() => _actionType = 'device_command')),
             const SizedBox(height: 8),
@@ -274,7 +274,7 @@ class _NewAutomationSheetState extends State<_NewAutomationSheet> {
           ],
 
           if (_step == 2) ...[
-            Text('Step 3: Name & Confirm', style: AppTypography.orbitron(fontSize: 14)),
+            Text('Step 3: Name & Confirm', style: AppTypography.displaySmall),
             const SizedBox(height: 16),
             TextField(
               controller: _nameCtrl,
@@ -364,7 +364,7 @@ class _OptionTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: AppTypography.exo(fontSize: 13, fontWeight: FontWeight.w600, color: selected ? AppColors.textPrimary : AppColors.textSecondary)),
+                  Text(title, style: AppTypography.labelLarge.copyWith(color: selected ? AppColors.textPrimary : AppColors.textSecondary)),
                   Text(subtitle, style: AppTypography.bodySmall),
                 ],
               ),

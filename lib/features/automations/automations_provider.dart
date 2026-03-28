@@ -3,7 +3,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/network/dio_client.dart';
 import '../../core/network/api_endpoints.dart';
 import '../../core/storage/secure_storage.dart';
-import '../../models/automation.dart';
+import '../../shared/models/automation.dart';
 
 class AutomationsNotifier extends AsyncNotifier<List<Automation>> {
   final _uuid = const Uuid();
@@ -12,19 +12,22 @@ class AutomationsNotifier extends AsyncNotifier<List<Automation>> {
   Future<List<Automation>> build() async {
     final isDemoMode = await SecureStorageService.instance.isDemoMode();
     if (isDemoMode) return demoAutomations();
-    return _fetch();
+
+    try {
+      final dio = await DioClient.instance.dio;
+      final response = await dio.get(ApiEndpoints.automations).timeout(const Duration(seconds: 8));
+      final list = response.data as List<dynamic>;
+      return list.map((e) => Automation.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (e) {
+      throw 'Automations unavailable. Check hub connection.';
+    }
   }
 
-  Future<List<Automation>> _fetch() async {
-    final dio = await DioClient.instance.dio;
-    final response = await dio.get(ApiEndpoints.automations);
-    final list = response.data as List<dynamic>;
-    return list.map((e) => Automation.fromJson(e as Map<String, dynamic>)).toList();
-  }
-
+  // The _fetch method is removed as its logic is now directly in build().
+  // The refresh method needs to be updated to reflect this change.
   Future<void> refresh() async {
     state = const AsyncLoading();
-    state = await AsyncValue.guard(_fetch);
+    state = await AsyncValue.guard(build); // Call build() directly to re-fetch
   }
 
   Future<void> toggle(String id) async {

@@ -1,4 +1,4 @@
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SecureStorageService {
   SecureStorageService._();
@@ -9,30 +9,63 @@ class SecureStorageService {
   static const _ipKey = 'nestshift_ip';
   static const _portKey = 'nestshift_port';
   static const _demoModeKey = 'nestshift_demo_mode';
+  static const _onboardingCompleteKey = 'nestshift_onboarding_complete';
 
-  final _storage = const FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
-    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock_this_device),
-  );
+  late SharedPreferences _prefs;
+  bool _initialized = false;
+
+  Future<void> init() async {
+    if (_initialized) return;
+    _prefs = await SharedPreferences.getInstance();
+    _initialized = true;
+  }
+
+  Future<void> _ensureInitialized() async {
+    if (!_initialized) await init();
+  }
 
   // Token
-  Future<void> saveToken(String token) => _storage.write(key: _tokenKey, value: token);
-  Future<String?> getToken() => _storage.read(key: _tokenKey);
-  Future<void> deleteToken() => _storage.delete(key: _tokenKey);
+  Future<void> saveToken(String token) async {
+    await _ensureInitialized();
+    await _prefs.setString(_tokenKey, token);
+  }
+  
+  Future<String?> getToken() async {
+    await _ensureInitialized();
+    return _prefs.getString(_tokenKey);
+  }
+  
+  Future<void> deleteToken() async {
+    await _ensureInitialized();
+    await _prefs.remove(_tokenKey);
+  }
 
   // Hub ID
-  Future<void> saveHubId(String hubId) => _storage.write(key: _hubIdKey, value: hubId);
-  Future<String?> getHubId() => _storage.read(key: _hubIdKey);
+  Future<void> saveHubId(String hubId) async {
+    await _ensureInitialized();
+    await _prefs.setString(_hubIdKey, hubId);
+  }
+  
+  Future<String?> getHubId() async {
+    await _ensureInitialized();
+    return _prefs.getString(_hubIdKey);
+  }
 
   // Connection info
   Future<void> saveConnectionInfo({required String ip, required int port}) async {
-    await _storage.write(key: _ipKey, value: ip);
-    await _storage.write(key: _portKey, value: port.toString());
+    await _ensureInitialized();
+    await _prefs.setString(_ipKey, ip);
+    await _prefs.setString(_portKey, port.toString());
   }
 
-  Future<String?> getIp() => _storage.read(key: _ipKey);
+  Future<String?> getIp() async {
+    await _ensureInitialized();
+    return _prefs.getString(_ipKey);
+  }
+  
   Future<int> getPort() async {
-    final val = await _storage.read(key: _portKey);
+    await _ensureInitialized();
+    final val = _prefs.getString(_portKey);
     return int.tryParse(val ?? '8000') ?? 8000;
   }
 
@@ -44,12 +77,32 @@ class SecureStorageService {
   }
 
   // Demo mode
-  Future<void> setDemoMode(bool value) => _storage.write(key: _demoModeKey, value: value.toString());
+  Future<void> setDemoMode(bool value) async {
+    await _ensureInitialized();
+    await _prefs.setString(_demoModeKey, value.toString());
+  }
+  
   Future<bool> isDemoMode() async {
-    final val = await _storage.read(key: _demoModeKey);
+    await _ensureInitialized();
+    final val = _prefs.getString(_demoModeKey);
+    return val == 'true';
+  }
+
+  // Onboarding
+  Future<void> setOnboardingComplete(bool value) async {
+    await _ensureInitialized();
+    await _prefs.setString(_onboardingCompleteKey, value.toString());
+  }
+  
+  Future<bool> isOnboardingComplete() async {
+    await _ensureInitialized();
+    final val = _prefs.getString(_onboardingCompleteKey);
     return val == 'true';
   }
 
   // Clear all
-  Future<void> clearAll() => _storage.deleteAll();
+  Future<void> clearAll() async {
+    await _ensureInitialized();
+    await _prefs.clear();
+  }
 }

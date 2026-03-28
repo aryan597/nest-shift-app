@@ -94,7 +94,7 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: AppColors.border),
                   ),
-                  child: Text(_quickCommands[i], style: AppTypography.exo(fontSize: 12, color: AppColors.textSecondary)),
+                  child: Text(_quickCommands[i], style: AppTypography.bodySmall),
                 ),
               ),
             ),
@@ -112,25 +112,24 @@ class _BrainHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppColors.border)),
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       child: Row(
         children: [
           Container(
-            width: 8,
-            height: 8,
+            width: 12,
+            height: 12,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: AppColors.primary,
-              boxShadow: [BoxShadow(color: AppColors.primary.withValues(alpha: 0.6), blurRadius: 6)],
+              boxShadow: [
+                BoxShadow(color: AppColors.primary.withValues(alpha: 0.4), blurRadius: 10, spreadRadius: 2),
+              ],
             ),
           ),
-          const SizedBox(width: 10),
-          Text('NestShift Brain', style: AppTypography.orbitron(fontSize: 14)),
+          const SizedBox(width: 14),
+          Text('BRAIN ACTIVE', style: AppTypography.inter(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.primary, letterSpacing: 2)),
           const Spacer(),
-          Text('AI Assistant', style: AppTypography.labelSmall),
+          Text('v1.2.0-core', style: AppTypography.labelSmall.copyWith(fontSize: 9)),
         ],
       ),
     );
@@ -156,18 +155,17 @@ class _UserBubble extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.12),
-                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                    color: AppColors.primary,
                     borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(12),
-                      topRight: Radius.circular(12),
-                      bottomLeft: Radius.circular(12),
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
+                      bottomLeft: Radius.circular(20),
                     ),
                   ),
-                  child: Text(message, style: AppTypography.exo(fontSize: 14)),
+                  child: Text(message, style: AppTypography.bodyMedium.copyWith(color: AppColors.background, fontWeight: FontWeight.w600)),
                 ),
-                const SizedBox(height: 4),
-                Text(_formatTime(time), style: AppTypography.mono(fontSize: 10, color: AppColors.textMuted)),
+                const SizedBox(height: 6),
+                Text(_formatTime(time), style: AppTypography.inter(fontSize: 10, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
               ],
             ),
           ),
@@ -212,15 +210,14 @@ class _AiBubble extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    border: Border.all(color: AppColors.border),
+                    color: AppColors.raised.withValues(alpha: 0.5),
                     borderRadius: const BorderRadius.only(
-                      topRight: Radius.circular(12),
-                      bottomLeft: Radius.circular(12),
-                      bottomRight: Radius.circular(12),
+                      topRight: Radius.circular(20),
+                      bottomLeft: Radius.circular(20),
+                      bottomRight: Radius.circular(20),
                     ),
                   ),
-                  child: Text(message, style: AppTypography.exo(fontSize: 14)),
+                  child: Text(message, style: AppTypography.bodyMedium.copyWith(height: 1.5)),
                 ),
                 if (devices.isNotEmpty) ...[
                   const SizedBox(height: 6),
@@ -353,10 +350,10 @@ class _InputRow extends StatelessWidget {
             Expanded(
               child: TextField(
                 controller: controller,
-                style: AppTypography.exo(fontSize: 14),
+                style: AppTypography.bodyMedium,
                 decoration: InputDecoration(
                   hintText: 'Ask NestShift Brain...',
-                  hintStyle: AppTypography.exo(fontSize: 14, color: AppColors.textMuted),
+                  hintStyle: AppTypography.bodyMedium.copyWith(color: AppColors.textMuted),
                   filled: true,
                   fillColor: AppColors.raised,
                   border: const OutlineInputBorder(

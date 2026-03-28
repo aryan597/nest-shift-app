@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
-import '../../../models/device.dart';
+import '../../../shared/models/device.dart';
 import '../../../shared/widgets/nest_panel.dart';
+import '../../../shared/widgets/glass_panel.dart';
 import '../../../shared/widgets/status_chip.dart';
 
 class SensorCard extends StatelessWidget {
@@ -42,67 +43,62 @@ class SensorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return NestPanel(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            // Icon container
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppColors.raised,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Icon(_icon, size: 22, color: device.online ? AppColors.primary : AppColors.textMuted),
+    return GlassPanel(
+      padding: const EdgeInsets.all(20),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppColors.raised.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(14),
             ),
-            const SizedBox(width: 14),
-            // Name + room
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(device.name, style: AppTypography.exo(fontSize: 14, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 3),
-                  Row(
-                    children: [
-                      Icon(Icons.location_on_outlined, size: 11, color: AppColors.textMuted),
-                      const SizedBox(width: 3),
-                      Text(device.room, style: AppTypography.labelSmall),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Updated ${_formatLastSeen(device.lastSeen)}',
-                    style: AppTypography.mono(fontSize: 9, color: AppColors.textMuted),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            // Value + status
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+            child: Icon(_icon, size: 24, color: device.online ? AppColors.primary : AppColors.textMuted),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  _valueDisplay,
-                  style: AppTypography.mono(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: device.online ? AppColors.primary : AppColors.textMuted,
-                  ),
+                Text(device.name, style: AppTypography.outfit(fontSize: 15, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(Icons.location_on_outlined, size: 12, color: AppColors.textMuted),
+                    const SizedBox(width: 4),
+                    Text(device.room, style: AppTypography.bodySmall.copyWith(fontSize: 11)),
+                  ],
                 ),
                 const SizedBox(height: 6),
-                StatusChip(
-                  variant: device.online ? StatusChipVariant.active : StatusChipVariant.offline,
-                  label: device.online ? 'Active' : 'Offline',
+                Text(
+                  'Sync: ${_formatLastSeen(device.lastSeen)}',
+                  style: AppTypography.inter(fontSize: 10, color: AppColors.textMuted, fontWeight: FontWeight.w500),
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                _valueDisplay,
+                style: AppTypography.outfit(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: device.online ? AppColors.textPrimary : AppColors.textMuted,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(height: 6),
+              StatusChip(
+                variant: device.online ? StatusChipVariant.active : StatusChipVariant.offline,
+                label: device.online ? 'Healthy' : 'Sync Lost',
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

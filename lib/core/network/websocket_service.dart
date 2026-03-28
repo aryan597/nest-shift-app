@@ -52,7 +52,7 @@ class WebSocketService {
       final (ip, port) = info;
       final uri = Uri.parse(ApiEndpoints.wsUrl(ip, port, token));
       _channel = WebSocketChannel.connect(uri);
-      await _channel!.ready;
+      await _channel!.ready.timeout(const Duration(seconds: 10));
       _setState(WsConnectionState.connected);
       _reconnectAttempts = 0;
       _startPing();

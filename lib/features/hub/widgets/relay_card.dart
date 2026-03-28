@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
-import '../../../models/device.dart';
+import '../../../shared/models/device.dart';
 import '../../../shared/widgets/nest_panel.dart';
+import '../../../shared/widgets/glass_panel.dart';
 import 'metallic_toggle.dart';
 
 class RelayCard extends StatelessWidget {
@@ -14,101 +15,73 @@ class RelayCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isOn = device.state.on;
-    return NestPanel(
-      glowColor: isOn ? AppColors.primary : null,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Row 1: Pin badge + name + LED dot
-            Row(
-              children: [
-                // Pin badge
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.raised,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Text(
-                    'PIN ${device.gpioPin}',
-                    style: AppTypography.mono(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                    ),
-                  ),
+    return GlassPanel(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.raised.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    device.name,
-                    style: AppTypography.exo(fontSize: 15, fontWeight: FontWeight.w600),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                // LED status dot
-                _LedDot(isOn: isOn, isOnline: device.online),
-              ],
-            ),
-            const SizedBox(height: 6),
-            // Row 2: Room label + protocol
-            Row(
-              children: [
-                Icon(Icons.location_on_outlined, size: 12, color: AppColors.textMuted),
-                const SizedBox(width: 4),
-                Text(device.room, style: AppTypography.labelSmall),
-                const SizedBox(width: 10),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppColors.raised,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    device.protocol.toUpperCase(),
-                    style: AppTypography.mono(fontSize: 9, color: AppColors.textMuted),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            // Row 3: Toggle + state label
-            Row(
-              children: [
-                MetallicToggle(
-                  value: isOn,
-                  onChanged: device.online ? onToggle : null,
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  isOn ? 'ON' : 'OFF',
+                child: Text(
+                  'GPIO ${device.gpioPin}',
                   style: AppTypography.mono(
-                    fontSize: 12,
+                    fontSize: 10,
                     fontWeight: FontWeight.w700,
-                    color: isOn ? AppColors.primary : AppColors.textMuted,
+                    color: AppColors.primary,
                   ),
                 ),
-                const Spacer(),
-                if (!device.online)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: AppColors.warning.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
-                    ),
-                    child: Text(
-                      'OFFLINE',
-                      style: AppTypography.mono(fontSize: 9, color: AppColors.warning),
-                    ),
-                  ),
-              ],
-            ),
-          ],
-        ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  device.name,
+                  style: AppTypography.outfit(fontSize: 16, fontWeight: FontWeight.w600),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              _LedDot(isOn: isOn, isOnline: device.online),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(Icons.location_on_outlined, size: 14, color: AppColors.textMuted),
+              const SizedBox(width: 6),
+              Text(device.room, style: AppTypography.bodySmall),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              MetallicToggle(
+                value: isOn,
+                onChanged: device.online ? onToggle : null,
+              ),
+              const SizedBox(width: 16),
+              Text(
+                isOn ? 'ACTIVE' : 'IDLE',
+                style: AppTypography.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: isOn ? AppColors.primary : AppColors.textMuted,
+                  letterSpacing: 1,
+                ),
+              ),
+              const Spacer(),
+              if (!device.online)
+                Text(
+                  'OFFLINE',
+                  style: AppTypography.inter(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.warning),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }

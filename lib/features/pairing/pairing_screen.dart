@@ -48,7 +48,7 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
         content: Row(children: [
           Container(width: 3, height: 40, color: AppColors.warning),
           const SizedBox(width: 12),
-          Expanded(child: Text(msg, style: AppTypography.exo(fontSize: 13))),
+          Expanded(child: Text(msg, style: AppTypography.bodySmall)),
         ]),
         backgroundColor: AppColors.raised,
         behavior: SnackBarBehavior.floating,
@@ -77,7 +77,7 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Manual Connection', style: AppTypography.orbitron(fontSize: 16)),
+            Text('Manual Connection', style: AppTypography.displaySmall),
             const SizedBox(height: 6),
             Text('Enter your Pi\'s IP address and pairing code', style: AppTypography.bodySmall),
             const SizedBox(height: 20),
@@ -134,7 +134,16 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
     final state = ref.watch(pairingProvider);
     final isConnecting = state.value?.status == PairingStatus.connecting;
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        // Go back to login screen
+        if (context.mounted) {
+          context.go('/onboarding/login');
+        }
+      },
+      child: Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
         children: [
@@ -169,8 +178,8 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
                   children: [
                     RichText(
                       text: TextSpan(children: [
-                        TextSpan(text: 'NEST', style: AppTypography.orbitron(fontSize: 28, color: Colors.white)),
-                        TextSpan(text: 'SHIFT', style: AppTypography.orbitron(fontSize: 28, color: AppColors.primary)),
+                        TextSpan(text: 'NEST', style: AppTypography.displayLarge.copyWith(color: Colors.white)),
+                        TextSpan(text: 'SHIFT', style: AppTypography.displayLarge.copyWith(color: AppColors.primary)),
                       ]),
                     ),
                     const SizedBox(height: 8),
@@ -242,7 +251,7 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
                       onPressed: _activateDemoMode,
                       child: Text(
                         'Demo Mode',
-                        style: AppTypography.exo(color: AppColors.accent, fontWeight: FontWeight.w600),
+                        style: AppTypography.labelLarge.copyWith(color: AppColors.accent),
                       ),
                     ),
                   ],
@@ -252,6 +261,7 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
           ),
         ],
       ),
+    ),
     );
   }
 

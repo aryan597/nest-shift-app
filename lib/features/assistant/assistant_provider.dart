@@ -5,7 +5,7 @@ import '../../core/network/dio_client.dart';
 import '../../core/network/api_endpoints.dart';
 import '../../core/network/websocket_service.dart';
 import '../../core/storage/secure_storage.dart';
-import '../../models/chat_message.dart';
+import '../../shared/models/chat_message.dart';
 
 class AssistantState {
   final List<ChatMessage> messages;

@@ -5,8 +5,9 @@ class SettingsState {
   final String? ip;
   final int port;
   final String? hubId;
+  final String? token;
   final bool isDemoMode;
-  const SettingsState({this.ip, required this.port, this.hubId, required this.isDemoMode});
+  const SettingsState({this.ip, required this.port, this.hubId, this.token, required this.isDemoMode});
 }
 
 class SettingsNotifier extends AsyncNotifier<SettingsState> {
@@ -15,8 +16,9 @@ class SettingsNotifier extends AsyncNotifier<SettingsState> {
     final ip = await SecureStorageService.instance.getIp();
     final port = await SecureStorageService.instance.getPort();
     final hubId = await SecureStorageService.instance.getHubId();
+    final token = await SecureStorageService.instance.getToken();
     final isDemoMode = await SecureStorageService.instance.isDemoMode();
-    return SettingsState(ip: ip, port: port, hubId: hubId, isDemoMode: isDemoMode);
+    return SettingsState(ip: ip, port: port, hubId: hubId, token: token, isDemoMode: isDemoMode);
   }
 
   Future<void> unpair() async {

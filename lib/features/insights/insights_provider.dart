@@ -2,7 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/network/dio_client.dart';
 import '../../core/network/api_endpoints.dart';
 import '../../core/storage/secure_storage.dart';
-import '../../models/insight.dart';
+import '../../shared/models/insight.dart';
 
 class InsightsNotifier extends AsyncNotifier<List<Insight>> {
   @override

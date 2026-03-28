@@ -27,9 +27,9 @@ class DioClient {
 
     _dio = Dio(BaseOptions(
       baseUrl: baseUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 30),
-      sendTimeout: const Duration(seconds: 10),
+      connectTimeout: const Duration(seconds: 5),
+      receiveTimeout: const Duration(seconds: 15),
+      sendTimeout: const Duration(seconds: 5),
       headers: {'Content-Type': 'application/json'},
     ));
 
@@ -46,9 +46,9 @@ class DioClient {
     _initialized = false;
     _dio = Dio(BaseOptions(
       baseUrl: ApiEndpoints.baseUrl(ip, port),
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 30),
-      sendTimeout: const Duration(seconds: 10),
+      connectTimeout: const Duration(seconds: 5),
+      receiveTimeout: const Duration(seconds: 15),
+      sendTimeout: const Duration(seconds: 5),
       headers: {'Content-Type': 'application/json'},
     ));
     _dio.interceptors.addAll([
