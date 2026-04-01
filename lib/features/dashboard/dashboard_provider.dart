@@ -40,6 +40,123 @@ class ConnectionNotifier extends AsyncNotifier<ConnectionState> {
 
 final connectionProvider = AsyncNotifierProvider<ConnectionNotifier, ConnectionState>(ConnectionNotifier.new);
 
+// ─── Hub System Status Provider ───────────────────────────────────────────────
+
+class HubSystemInfo {
+  final String hubName;
+  final String hubId;
+  final String version;
+  final int uptimeSeconds;
+  final bool mqttConnected;
+  final int deviceCount;
+  final int onlineDeviceCount;
+  final int activeAutomations;
+  final int activeSchedules;
+  final double memoryMb;
+  final double cpuPercent;
+  final double diskPercent;
+  final DateTime? timestamp;
+
+  const HubSystemInfo({
+    required this.hubName,
+    required this.hubId,
+    required this.version,
+    required this.uptimeSeconds,
+    required this.mqttConnected,
+    required this.deviceCount,
+    required this.onlineDeviceCount,
+    required this.activeAutomations,
+    required this.activeSchedules,
+    required this.memoryMb,
+    required this.cpuPercent,
+    required this.diskPercent,
+    this.timestamp,
+  });
+
+  factory HubSystemInfo.fromJson(Map<String, dynamic> json) {
+    return HubSystemInfo(
+      hubName: json['hub_name'] as String? ?? 'NestShift Hub',
+      hubId: json['hub_id'] as String? ?? '',
+      version: json['version'] as String? ?? '1.0.0',
+      uptimeSeconds: json['uptime_seconds'] as int? ?? 0,
+      mqttConnected: json['mqtt_connected'] as bool? ?? false,
+      deviceCount: json['device_count'] as int? ?? 0,
+      onlineDeviceCount: json['online_device_count'] as int? ?? 0,
+      activeAutomations: json['active_automations'] as int? ?? 0,
+      activeSchedules: json['active_schedules'] as int? ?? 0,
+      memoryMb: (json['memory_mb'] as num?)?.toDouble() ?? 0,
+      cpuPercent: (json['cpu_percent'] as num?)?.toDouble() ?? 0,
+      diskPercent: (json['disk_percent'] as num?)?.toDouble() ?? 0,
+      timestamp: json['timestamp'] != null 
+          ? DateTime.tryParse(json['timestamp'] as String)
+          : null,
+    );
+  }
+
+  factory HubSystemInfo.demo() => const HubSystemInfo(
+        hubName: 'NestShift Hub',
+        hubId: 'demo-hub-001',
+        version: '1.0.0',
+        uptimeSeconds: 16320,
+        mqttConnected: true,
+        deviceCount: 10,
+        onlineDeviceCount: 8,
+        activeAutomations: 5,
+        activeSchedules: 3,
+        memoryMb: 45.2,
+        cpuPercent: 12.5,
+        diskPercent: 32.1,
+      );
+
+  String get uptimeFormatted {
+    if (uptimeSeconds < 60) return '${uptimeSeconds}s';
+    if (uptimeSeconds < 3600) return '${(uptimeSeconds / 60).floor()}m ${uptimeSeconds % 60}s';
+    final hours = uptimeSeconds ~/ 3600;
+    final minutes = (uptimeSeconds % 3600) ~/ 60;
+    return '${hours}h ${minutes}m';
+  }
+}
+
+class HubSystemStatusNotifier extends AsyncNotifier<HubSystemInfo> {
+  Timer? _refreshTimer;
+
+  @override
+  Future<HubSystemInfo> build() async {
+    final isDemoMode = await SecureStorageService.instance.isDemoMode();
+    if (isDemoMode) return HubSystemInfo.demo();
+    
+    _startRefreshTimer();
+    ref.onDispose(() => _refreshTimer?.cancel());
+    
+    return _fetchStatus();
+  }
+
+  Future<HubSystemInfo> _fetchStatus() async {
+    try {
+      final dio = await DioClient.instance.dio;
+      final response = await dio.get(ApiEndpoints.systemStatus);
+      return HubSystemInfo.fromJson(response.data as Map<String, dynamic>);
+    } catch (_) {
+      return HubSystemInfo.demo();
+    }
+  }
+
+  void _startRefreshTimer() {
+    _refreshTimer?.cancel();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
+      final info = await _fetchStatus();
+      state = AsyncData(info);
+    });
+  }
+
+  Future<void> refresh() async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(_fetchStatus);
+  }
+}
+
+final hubSystemStatusProvider = AsyncNotifierProvider<HubSystemStatusNotifier, HubSystemInfo>(HubSystemStatusNotifier.new);
+
 // ─── Devices Provider ─────────────────────────────────────────────────────────
 
 class DevicesNotifier extends AsyncNotifier<List<Device>> {

@@ -2,8 +2,9 @@
 class AppConstants {
   static const String dummyUserId = "0000";
   static const String dummyPinCode = "0000";
-  static const String defaultLocalHost = "nestshift.local";
+  static const String defaultLocalHost = "100.86.202.10";
   static const int defaultLocalPort = 8000;
+  static const int brainPort = 8001;
   
   static const String keyToken = "AUTH_TOKEN";
   static const String keyDeviceIp = "DEVICE_IP";
@@ -12,4 +13,5 @@ class AppConstants {
   
   static String get defaultBaseUrl => "http://$defaultLocalHost:$defaultLocalPort";
   static String get defaultWebSocketUrl => "ws://$defaultLocalHost:$defaultLocalPort/ws";
+  static String get defaultBrainUrl => "http://$defaultLocalHost:$brainPort";
 }

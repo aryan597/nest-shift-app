@@ -15,8 +15,8 @@ class BrainStatusNotifier extends AsyncNotifier<BrainStatus> {
     final isDemoMode = await SecureStorageService.instance.isDemoMode();
     if (isDemoMode) return BrainStatus.demo();
 
+    _connectWebSocket();
     _startPolling();
-    _listenToWebSocket();
     ref.onDispose(() {
       _pollTimer?.cancel();
       _wsSub?.cancel();
@@ -24,9 +24,20 @@ class BrainStatusNotifier extends AsyncNotifier<BrainStatus> {
     return _fetchStatus();
   }
 
+  Future<void> _connectWebSocket() async {
+    await BrainWebSocketService.instance.connect();
+    _wsSub?.cancel();
+    _wsSub = BrainWebSocketService.instance.eventStream.listen((event) {
+      if (event['type'] == 'brain_status') {
+        final data = event['data'] as Map<String, dynamic>?;
+        if (data != null) state = AsyncData(BrainStatus.fromJson(data));
+      }
+    });
+  }
+
   Future<BrainStatus> _fetchStatus() async {
     try {
-      final dio = await DioClient.instance.dio;
+      final dio = await BrainDioClient.instance.dio;
       final response = await dio.get(ApiEndpoints.brainStatus);
       return BrainStatus.fromJson(response.data as Map<String, dynamic>);
     } catch (_) {
@@ -36,19 +47,9 @@ class BrainStatusNotifier extends AsyncNotifier<BrainStatus> {
 
   void _startPolling() {
     _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
+    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
       final status = await _fetchStatus();
       state = AsyncData(status);
-    });
-  }
-
-  void _listenToWebSocket() {
-    _wsSub?.cancel();
-    _wsSub = WebSocketService.instance.eventStream.listen((event) {
-      if (event['type'] == 'brain_status') {
-        final data = event['data'] as Map<String, dynamic>?;
-        if (data != null) state = AsyncData(BrainStatus.fromJson(data));
-      }
     });
   }
 

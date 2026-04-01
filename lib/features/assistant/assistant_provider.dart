@@ -62,7 +62,7 @@ class AssistantNotifier extends AsyncNotifier<AssistantState> {
 
   Future<List<ChatMessage>> _loadHistory() async {
     try {
-      final dio = await DioClient.instance.dio;
+      final dio = await BrainDioClient.instance.dio;
       final response = await dio.get(ApiEndpoints.aiHistory);
       final list = response.data as List<dynamic>;
       return list.map((e) => ChatMessage.fromJson(e as Map<String, dynamic>)).toList();
@@ -73,9 +73,9 @@ class AssistantNotifier extends AsyncNotifier<AssistantState> {
 
   void _listenToWebSocket() {
     _wsSub?.cancel();
-    _wsSub = WebSocketService.instance.eventStream.listen((event) {
+    _wsSub = BrainWebSocketService.instance.eventStream.listen((event) {
       if (event['type'] == 'ai_response') {
-        final data = event['data'] as Map<String, dynamic>?;
+        final data = event as Map<String, dynamic>?;
         if (data != null) {
           final current = state.value;
           if (current == null) return;
@@ -108,7 +108,7 @@ class AssistantNotifier extends AsyncNotifier<AssistantState> {
         return;
       }
 
-      final dio = await DioClient.instance.dio;
+      final dio = await BrainDioClient.instance.dio;
       final response = await dio.post(ApiEndpoints.aiCommand, data: {
         'text': text,
         'session_id': current.sessionId,

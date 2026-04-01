@@ -107,6 +107,22 @@ class HubNotifier extends AsyncNotifier<List<Device>> {
     state = const AsyncLoading();
     state = await AsyncValue.guard(_fetch);
   }
+
+  Future<void> rebootHub() async {
+    final isDemoMode = await SecureStorageService.instance.isDemoMode();
+    if (isDemoMode) return;
+    
+    final dio = await DioClient.instance.dio;
+    await dio.post(ApiEndpoints.hubReboot).timeout(const Duration(seconds: 10));
+  }
+
+  Future<void> restartService(String service) async {
+    final isDemoMode = await SecureStorageService.instance.isDemoMode();
+    if (isDemoMode) return;
+    
+    final dio = await DioClient.instance.dio;
+    await dio.post(ApiEndpoints.hubRestart(service)).timeout(const Duration(seconds: 10));
+  }
 }
 
 final hubProvider = AsyncNotifierProvider<HubNotifier, List<Device>>(() => HubNotifier());
@@ -121,10 +137,43 @@ class GpioPinsNotifier extends AsyncNotifier<List<GpioPin>> {
     try {
       final dio = await DioClient.instance.dio;
       final response = await dio.get(ApiEndpoints.gpioPins).timeout(const Duration(seconds: 8));
-      final list = response.data as List<dynamic>;
-      return list.map((e) => GpioPin.fromJson(e as Map<String, dynamic>)).toList();
+      
+      // Backend returns {"outputs": [...], "inputs": [...]} - need to flatten
+      final data = response.data as Map<String, dynamic>;
+      final outputs = (data['outputs'] as List<dynamic>?) ?? [];
+      final inputs = (data['inputs'] as List<dynamic>?) ?? [];
+      
+      final List<GpioPin> pins = [];
+      
+      for (var o in outputs) {
+        final json = o as Map<String, dynamic>;
+        pins.add(GpioPin(
+          pin: json['pin'] as int,
+          name: json['name'] as String?,
+          mode: 'output',
+          isRegistered: true,
+          state: json['initial_state'] == 1,
+          deviceType: 'relay',
+          room: null,
+        ));
+      }
+      
+      for (var i in inputs) {
+        final json = i as Map<String, dynamic>;
+        pins.add(GpioPin(
+          pin: json['pin'] as int,
+          name: json['name'] as String?,
+          mode: 'input',
+          isRegistered: true,
+          state: null,
+          deviceType: 'sensor',
+          room: null,
+        ));
+      }
+      
+      return pins;
     } catch (e) {
-      throw 'Failed to get GPIO pins';
+      throw 'Failed to get GPIO pins: $e';
     }
   }
 
@@ -230,10 +279,47 @@ class GpioPinsNotifier extends AsyncNotifier<List<GpioPin>> {
     if (isDemoMode) {
       state = AsyncData(demoGpioPins());
     } else {
-      final dio = await DioClient.instance.dio;
-      final response = await dio.get(ApiEndpoints.gpioPins).timeout(const Duration(seconds: 8));
-      final list = response.data as List<dynamic>;
-      state = AsyncData(list.map((e) => GpioPin.fromJson(e as Map<String, dynamic>)).toList());
+      try {
+        final dio = await DioClient.instance.dio;
+        final response = await dio.get(ApiEndpoints.gpioPins).timeout(const Duration(seconds: 8));
+        
+        // Backend returns {"outputs": [...], "inputs": [...]} - need to flatten
+        final data = response.data as Map<String, dynamic>;
+        final outputs = (data['outputs'] as List<dynamic>?) ?? [];
+        final inputs = (data['inputs'] as List<dynamic>?) ?? [];
+        
+        final List<GpioPin> pins = [];
+        
+        for (var o in outputs) {
+          final json = o as Map<String, dynamic>;
+          pins.add(GpioPin(
+            pin: json['pin'] as int,
+            name: json['name'] as String?,
+            mode: 'output',
+            isRegistered: true,
+            state: json['initial_state'] == 1,
+            deviceType: 'relay',
+            room: null,
+          ));
+        }
+        
+        for (var i in inputs) {
+          final json = i as Map<String, dynamic>;
+          pins.add(GpioPin(
+            pin: json['pin'] as int,
+            name: json['name'] as String?,
+            mode: 'input',
+            isRegistered: true,
+            state: null,
+            deviceType: 'sensor',
+            room: null,
+          ));
+        }
+        
+        state = AsyncData(pins);
+      } catch (e) {
+        state = AsyncError(e, StackTrace.current);
+      }
     }
   }
 }

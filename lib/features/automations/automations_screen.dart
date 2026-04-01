@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
+import '../../core/theme/app_themes.dart';
+import '../../core/theme/theme_provider.dart';
 import '../../shared/models/automation.dart';
-import '../../shared/widgets/nest_panel.dart';
-import '../../shared/widgets/glass_panel.dart';
 import '../../features/hub/widgets/metallic_toggle.dart';
 import 'automations_provider.dart';
 
@@ -13,29 +13,43 @@ class AutomationsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final themeState = ref.watch(themeProvider);
+    final theme = themeState.theme;
+    final style = theme.style;
     final automationsAsync = ref.watch(automationsProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
-      floatingActionButton: FloatingActionButton(
-        elevation: 0,
-        highlightElevation: 0,
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.background,
-        onPressed: () => _showNewAutomationSheet(context, ref),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: const Icon(Icons.add_rounded, size: 28),
+      backgroundColor: theme.background,
+      floatingActionButton: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(style.cardRadius),
+          boxShadow: style.hasGlow ? [
+            BoxShadow(color: theme.primary.withValues(alpha: style.glowIntensity * 0.5), blurRadius: 12, spreadRadius: 0),
+          ] : null,
+        ),
+        child: FloatingActionButton(
+          elevation: 0,
+          highlightElevation: 0,
+          backgroundColor: theme.primary,
+          foregroundColor: theme.background,
+          onPressed: () => _showNewAutomationSheet(context, ref, theme, style),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(style.cardRadius)),
+          child: Icon(Icons.add_rounded, size: style.iconSize + 4),
+        ),
       ),
       body: automationsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+        loading: () => Center(child: CircularProgressIndicator(color: theme.primary)),
         error: (e, _) => Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline_rounded, color: AppColors.warning, size: 40),
-              const SizedBox(height: 16),
-              Text('Sync failed', style: AppTypography.displaySmall),
-              TextButton(onPressed: () => ref.refresh(automationsProvider), child: const Text('Retry')),
+              Icon(Icons.error_outline_rounded, color: AppColors.warning, size: style.iconSize + 16),
+              SizedBox(height: style.cardRadius),
+              Text('Sync failed', style: AppTypography.displaySmall.copyWith(color: theme.textPrimary)),
+              TextButton(
+                onPressed: () => ref.refresh(automationsProvider),
+                child: Text('Retry', style: TextStyle(color: theme.primary)),
+              ),
             ],
           ),
         ),
@@ -45,28 +59,32 @@ class AutomationsScreen extends ConsumerWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.auto_awesome_rounded, size: 64, color: AppColors.textMuted.withValues(alpha: 0.5)),
-                  const SizedBox(height: 24),
-                  Text('No Flows Yet', style: AppTypography.displayMedium),
-                  const SizedBox(height: 8),
-                  Text('Automate your home with smart logic.', style: AppTypography.bodySmall),
+                  Icon(Icons.auto_awesome_rounded, size: style.iconSize * 2.5, color: theme.textMuted.withValues(alpha: 0.5)),
+                  SizedBox(height: style.cardRadius * 1.5),
+                  Text('No Flows Yet', style: AppTypography.displayMedium.copyWith(color: theme.textPrimary)),
+                  SizedBox(height: style.cardRadius * 0.5),
+                  Text('Automate your home with smart logic.', style: AppTypography.bodySmall.copyWith(color: theme.textSecondary)),
                 ],
               ),
             );
           }
           return RefreshIndicator(
-            color: AppColors.primary,
-            backgroundColor: AppColors.surface,
-            onRefresh: () => ref.read(automationsProvider.notifier).refresh(),
+            color: theme.primary,
+            backgroundColor: theme.surface,
+            onRefresh: () async {
+              await ref.read(automationsProvider.notifier).refresh();
+            },
             child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: EdgeInsets.symmetric(horizontal: style.cardRadius, vertical: style.cardRadius * 0.85),
               itemCount: automations.length,
               itemBuilder: (_, i) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
+                padding: EdgeInsets.only(bottom: style.cardRadius * 0.75),
                 child: _AutomationCard(
                   automation: automations[i],
+                  theme: theme,
+                  style: style,
                   onToggle: () => ref.read(automationsProvider.notifier).toggle(automations[i].id),
-                  onTap: () => _showDetailSheet(context, ref, automations[i]),
+                  onTap: () => _showDetailSheet(context, ref, automations[i], theme, style),
                 ),
               ),
             ),
@@ -76,25 +94,25 @@ class AutomationsScreen extends ConsumerWidget {
     );
   }
 
-  void _showDetailSheet(BuildContext context, WidgetRef ref, Automation automation) {
+  void _showDetailSheet(BuildContext context, WidgetRef ref, Automation automation, AppTheme theme, ThemeStyle style) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      backgroundColor: theme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(style.cardRadius * 1.25)),
       ),
       builder: (_) => Padding(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(style.cardRadius * 1.5),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(automation.name, style: AppTypography.displayMedium),
-            const SizedBox(height: 8),
-            Text('Trigger: ${automation.triggerDescription}', style: AppTypography.bodySmall),
-            const SizedBox(height: 6),
-            Text('Action: ${automation.action.type}', style: AppTypography.bodySmall),
-            const SizedBox(height: 24),
+            Text(automation.name, style: AppTypography.displayMedium.copyWith(color: theme.textPrimary)),
+            SizedBox(height: style.cardRadius * 0.5),
+            Text('Trigger: ${automation.triggerDescription}', style: AppTypography.bodySmall.copyWith(color: theme.textSecondary)),
+            SizedBox(height: style.cardRadius * 0.4),
+            Text('Action: ${automation.actions.isNotEmpty ? automation.actions.first.type : 'none'}', style: AppTypography.bodySmall.copyWith(color: theme.textSecondary)),
+            SizedBox(height: style.cardRadius * 1.5),
             Row(
               children: [
                 Expanded(
@@ -103,7 +121,7 @@ class AutomationsScreen extends ConsumerWidget {
                       foregroundColor: AppColors.warning,
                       side: BorderSide(color: AppColors.warning.withValues(alpha: 0.5)),
                     ),
-                    icon: const Icon(Icons.delete_outline_rounded, size: 16),
+                    icon: Icon(Icons.delete_outline_rounded, size: style.iconSize * 0.65),
                     label: const Text('Delete'),
                     onPressed: () async {
                       Navigator.pop(context);
@@ -119,20 +137,20 @@ class AutomationsScreen extends ConsumerWidget {
     );
   }
 
-  void _showNewAutomationSheet(BuildContext context, WidgetRef ref) {
+  void _showNewAutomationSheet(BuildContext context, WidgetRef ref, AppTheme theme, ThemeStyle style) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      backgroundColor: theme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(style.cardRadius * 1.25)),
       ),
-      builder: (_) => _NewAutomationSheet(onSubmit: (name, trigger, action) async {
+      builder: (_) => _NewAutomationSheet(theme: theme, style: style, onSubmit: (name, trigger, actions) async {
         await ref.read(automationsProvider.notifier).create(
-              name: name,
-              trigger: trigger,
-              action: action,
-            );
+          name: name,
+          trigger: trigger,
+          actions: actions,
+        );
         if (context.mounted) Navigator.pop(context);
       }),
     );
@@ -141,66 +159,73 @@ class AutomationsScreen extends ConsumerWidget {
 
 class _AutomationCard extends StatelessWidget {
   final Automation automation;
+  final AppTheme theme;
+  final ThemeStyle style;
   final VoidCallback onToggle;
   final VoidCallback onTap;
 
-  const _AutomationCard({required this.automation, required this.onToggle, required this.onTap});
+  const _AutomationCard({required this.automation, required this.theme, required this.style, required this.onToggle, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final isTimeBased = automation.trigger.type == 'time';
-    return GlassPanel(
-      padding: EdgeInsets.zero,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: automation.enabled ? AppColors.primary.withValues(alpha: 0.1) : AppColors.raised.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(
-                  isTimeBased ? Icons.schedule_rounded : Icons.bolt_rounded,
-                  size: 24,
-                  color: automation.enabled ? AppColors.primary : AppColors.textMuted,
-                ),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.all(style.cardRadius * 1.25),
+        decoration: BoxDecoration(
+          color: theme.surface,
+          borderRadius: BorderRadius.circular(style.cardRadius),
+          border: style.cardBorderWidth > 0 ? Border.all(color: theme.border) : null,
+          boxShadow: style.hasGlow && automation.enabled ? [
+            BoxShadow(color: theme.primary.withValues(alpha: style.glowIntensity * 0.25), blurRadius: 10, spreadRadius: 0),
+          ] : null,
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: style.cardRadius * 3,
+              height: style.cardRadius * 3,
+              decoration: BoxDecoration(
+                color: automation.enabled ? theme.primary.withValues(alpha: 0.1) : theme.surfaceRaised.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(style.cardRadius * 0.85),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(automation.name, style: AppTypography.bodyLarge.copyWith(fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 4),
-                    Text(automation.triggerDescription, style: AppTypography.bodySmall.copyWith(fontSize: 11)),
-                  ],
-                ),
+              child: Icon(
+                isTimeBased ? Icons.schedule_rounded : Icons.bolt_rounded,
+                size: style.iconSize,
+                color: automation.enabled ? theme.primary : theme.textMuted,
               ),
-              const SizedBox(width: 12),
-              MetallicToggle(
-                value: automation.enabled,
-                small: true,
-                onChanged: (_) => onToggle(),
+            ),
+            SizedBox(width: style.cardRadius),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(automation.name, style: AppTypography.bodyLarge.copyWith(color: theme.textPrimary, fontWeight: FontWeight.w700)),
+                  SizedBox(height: style.cardRadius * 0.25),
+                  Text(automation.triggerDescription, style: AppTypography.bodySmall.copyWith(fontSize: 11, color: theme.textSecondary)),
+                ],
               ),
-            ],
-          ),
+            ),
+            SizedBox(width: style.cardRadius * 0.75),
+            MetallicToggle(
+              value: automation.enabled,
+              small: true,
+              onChanged: (_) => onToggle(),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-// ─── NEW AUTOMATION SHEET (3-step) ────────────────────────────────────────────
-
 class _NewAutomationSheet extends StatefulWidget {
-  final Future<void> Function(String name, AutomationTrigger trigger, AutomationAction action) onSubmit;
+  final AppTheme theme;
+  final ThemeStyle style;
+  final Future<void> Function(String name, AutomationTrigger trigger, List<AutomationAction> actions) onSubmit;
 
-  const _NewAutomationSheet({required this.onSubmit});
+  const _NewAutomationSheet({required this.theme, required this.style, required this.onSubmit});
 
   @override
   State<_NewAutomationSheet> createState() => _NewAutomationSheetState();
@@ -225,88 +250,109 @@ class _NewAutomationSheetState extends State<_NewAutomationSheet> {
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.only(
-        left: 24, right: 24, top: 24,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+        left: widget.style.cardRadius * 1.5, right: widget.style.cardRadius * 1.5, top: widget.style.cardRadius * 1.5,
+        bottom: MediaQuery.of(context).viewInsets.bottom + widget.style.cardRadius * 1.5,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Steps indicator
           Row(
             children: List.generate(3, (i) => Expanded(
               child: Container(
-                margin: const EdgeInsets.only(right: 4),
+                margin: EdgeInsets.only(right: i < 2 ? widget.style.cardRadius * 0.25 : 0),
                 height: 3,
                 decoration: BoxDecoration(
-                  color: i <= _step ? AppColors.primary : AppColors.raised,
+                  color: i <= _step ? widget.theme.primary : widget.theme.surfaceRaised,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             )),
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: widget.style.cardRadius * 1.25),
 
           if (_step == 0) ...[
-            Text('Step 1: Choose Trigger', style: AppTypography.displaySmall),
-            const SizedBox(height: 16),
-            _OptionTile(title: 'Time-based', subtitle: 'Runs at a specific time', icon: Icons.schedule_rounded, selected: _triggerType == 'time', onTap: () => setState(() => _triggerType = 'time')),
-            const SizedBox(height: 8),
-            _OptionTile(title: 'Device State', subtitle: 'Triggers when a device changes', icon: Icons.developer_board_rounded, selected: _triggerType == 'device_state', onTap: () => setState(() => _triggerType = 'device_state')),
-            const SizedBox(height: 8),
-            _OptionTile(title: 'Scene', subtitle: 'Activates on a scene trigger', icon: Icons.auto_awesome_rounded, selected: _triggerType == 'scene', onTap: () => setState(() => _triggerType = 'scene')),
+            Text('Step 1: Choose Trigger', style: AppTypography.displaySmall.copyWith(color: widget.theme.textPrimary)),
+            SizedBox(height: widget.style.cardRadius),
+            _OptionTile(theme: widget.theme, style: widget.style, title: 'Time-based', subtitle: 'Runs at a specific time', icon: Icons.schedule_rounded, selected: _triggerType == 'time', onTap: () => setState(() => _triggerType = 'time')),
+            SizedBox(height: widget.style.cardRadius * 0.5),
+            _OptionTile(theme: widget.theme, style: widget.style, title: 'Device State', subtitle: 'Triggers when a device changes', icon: Icons.developer_board_rounded, selected: _triggerType == 'device_state', onTap: () => setState(() => _triggerType = 'device_state')),
+            SizedBox(height: widget.style.cardRadius * 0.5),
+            _OptionTile(theme: widget.theme, style: widget.style, title: 'Scene', subtitle: 'Activates on a scene trigger', icon: Icons.auto_awesome_rounded, selected: _triggerType == 'scene', onTap: () => setState(() => _triggerType = 'scene')),
             if (_triggerType == 'time') ...[
-              const SizedBox(height: 12),
+              SizedBox(height: widget.style.cardRadius * 0.75),
               TextField(
                 controller: _timeCtrl,
-                decoration: const InputDecoration(labelText: 'Time (HH:MM)', prefixIcon: Icon(Icons.access_time_rounded)),
+                style: AppTypography.bodyMedium.copyWith(color: widget.theme.textPrimary),
+                decoration: InputDecoration(
+                  labelText: 'Time (HH:MM)',
+                  labelStyle: AppTypography.labelSmall.copyWith(color: widget.theme.textMuted),
+                  prefixIcon: Icon(Icons.access_time_rounded, color: widget.theme.textMuted, size: widget.style.iconSize),
+                  filled: true,
+                  fillColor: widget.theme.surfaceRaised,
+                ),
                 keyboardType: TextInputType.datetime,
               ),
             ],
           ],
 
           if (_step == 1) ...[
-            Text('Step 2: Choose Action', style: AppTypography.displaySmall),
-            const SizedBox(height: 16),
-            _OptionTile(title: 'Device Command', subtitle: 'Turn a device on or off', icon: Icons.power_settings_new_rounded, selected: _actionType == 'device_command', onTap: () => setState(() => _actionType = 'device_command')),
-            const SizedBox(height: 8),
-            _OptionTile(title: 'Scene', subtitle: 'Activate a scene', icon: Icons.palette_rounded, selected: _actionType == 'scene', onTap: () => setState(() => _actionType = 'scene')),
+            Text('Step 2: Choose Action', style: AppTypography.displaySmall.copyWith(color: widget.theme.textPrimary)),
+            SizedBox(height: widget.style.cardRadius),
+            _OptionTile(theme: widget.theme, style: widget.style, title: 'Device Command', subtitle: 'Turn a device on or off', icon: Icons.power_settings_new_rounded, selected: _actionType == 'device_command', onTap: () => setState(() => _actionType = 'device_command')),
+            SizedBox(height: widget.style.cardRadius * 0.5),
+            _OptionTile(theme: widget.theme, style: widget.style, title: 'Scene', subtitle: 'Activate a scene', icon: Icons.palette_rounded, selected: _actionType == 'scene', onTap: () => setState(() => _actionType = 'scene')),
           ],
 
           if (_step == 2) ...[
-            Text('Step 3: Name & Confirm', style: AppTypography.displaySmall),
-            const SizedBox(height: 16),
+            Text('Step 3: Name & Confirm', style: AppTypography.displaySmall.copyWith(color: widget.theme.textPrimary)),
+            SizedBox(height: widget.style.cardRadius),
             TextField(
               controller: _nameCtrl,
-              decoration: const InputDecoration(labelText: 'Automation Name', prefixIcon: Icon(Icons.label_rounded)),
+              style: AppTypography.bodyMedium.copyWith(color: widget.theme.textPrimary),
+              decoration: InputDecoration(
+                labelText: 'Automation Name',
+                labelStyle: AppTypography.labelSmall.copyWith(color: widget.theme.textMuted),
+                prefixIcon: Icon(Icons.label_rounded, color: widget.theme.textMuted, size: widget.style.iconSize),
+                filled: true,
+                fillColor: widget.theme.surfaceRaised,
+              ),
               autofocus: true,
             ),
-            const SizedBox(height: 12),
-            NestPanel(
-              padding: const EdgeInsets.all(12),
+            SizedBox(height: widget.style.cardRadius * 0.75),
+            Container(
+              padding: EdgeInsets.all(widget.style.cardRadius * 0.75),
+              decoration: BoxDecoration(
+                color: widget.theme.surfaceRaised,
+                borderRadius: BorderRadius.circular(widget.style.cardRadius * 0.75),
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Summary', style: AppTypography.labelSmall),
-                  const SizedBox(height: 6),
-                  Text('Trigger: $_triggerType${_triggerType == 'time' ? ' at ${_timeCtrl.text}' : ''}', style: AppTypography.bodySmall),
-                  Text('Action: $_actionType', style: AppTypography.bodySmall),
+                  Text('Summary', style: AppTypography.labelSmall.copyWith(color: widget.theme.textMuted)),
+                  SizedBox(height: widget.style.cardRadius * 0.4),
+                  Text('Trigger: $_triggerType${_triggerType == 'time' ? ' at ${_timeCtrl.text}' : ''}', style: AppTypography.bodySmall.copyWith(color: widget.theme.textSecondary)),
+                  Text('Action: $_actionType', style: AppTypography.bodySmall.copyWith(color: widget.theme.textSecondary)),
                 ],
               ),
             ),
           ],
 
-          const SizedBox(height: 24),
+          SizedBox(height: widget.style.cardRadius * 1.5),
           Row(
             children: [
               if (_step > 0)
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () => setState(() => _step--),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: widget.theme.textSecondary,
+                      side: BorderSide(color: widget.theme.border),
+                    ),
                     child: const Text('Back'),
                   ),
                 ),
-              if (_step > 0) const SizedBox(width: 12),
+              if (_step > 0) SizedBox(width: widget.style.cardRadius * 0.75),
               Expanded(
                 child: ElevatedButton(
                   onPressed: _isSubmitting ? null : () async {
@@ -315,16 +361,23 @@ class _NewAutomationSheetState extends State<_NewAutomationSheet> {
                     } else {
                       if (_nameCtrl.text.trim().isEmpty) return;
                       setState(() => _isSubmitting = true);
-                      await widget.onSubmit(
-                        _nameCtrl.text.trim(),
-                        AutomationTrigger(
-                          type: _triggerType,
-                          config: _triggerType == 'time' ? {'time': _timeCtrl.text} : {},
-                        ),
-                        AutomationAction(type: _actionType, config: {}),
+                      final trigger = AutomationTrigger(
+                        type: _triggerType,
+                        config: _triggerType == 'time' ? {'cron': '0 ${_timeCtrl.text.split(':')[0]} * * *'} : {},
                       );
+                      final actions = [
+                        AutomationAction(
+                          type: _actionType,
+                          config: {'command': _actionType == 'device_command' ? 'turn_on' : 'activate', 'target': 'all_devices'},
+                        ),
+                      ];
+                      await widget.onSubmit(_nameCtrl.text.trim(), trigger, actions);
                     }
                   },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: widget.theme.primary,
+                    foregroundColor: widget.theme.background,
+                  ),
                   child: Text(_step < 2 ? 'Next' : 'Create'),
                 ),
               ),
@@ -337,39 +390,41 @@ class _NewAutomationSheetState extends State<_NewAutomationSheet> {
 }
 
 class _OptionTile extends StatelessWidget {
+  final AppTheme theme;
+  final ThemeStyle style;
   final String title;
   final String subtitle;
   final IconData icon;
   final bool selected;
   final VoidCallback onTap;
 
-  const _OptionTile({required this.title, required this.subtitle, required this.icon, required this.selected, required this.onTap});
+  const _OptionTile({required this.theme, required this.style, required this.title, required this.subtitle, required this.icon, required this.selected, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(14),
+        padding: EdgeInsets.all(style.cardRadius),
         decoration: BoxDecoration(
-          color: selected ? AppColors.primary.withValues(alpha: 0.08) : AppColors.raised,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: selected ? AppColors.primary.withValues(alpha: 0.4) : AppColors.border),
+          color: selected ? theme.primary.withValues(alpha: 0.08) : theme.surfaceRaised,
+          borderRadius: BorderRadius.circular(style.cardRadius * 0.7),
+          border: Border.all(color: selected ? theme.primary.withValues(alpha: 0.4) : theme.border),
         ),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: selected ? AppColors.primary : AppColors.textMuted),
-            const SizedBox(width: 12),
+            Icon(icon, size: style.iconSize * 0.85, color: selected ? theme.primary : theme.textMuted),
+            SizedBox(width: style.cardRadius * 0.75),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: AppTypography.labelLarge.copyWith(color: selected ? AppColors.textPrimary : AppColors.textSecondary)),
-                  Text(subtitle, style: AppTypography.bodySmall),
+                  Text(title, style: AppTypography.labelLarge.copyWith(color: selected ? theme.textPrimary : theme.textSecondary)),
+                  Text(subtitle, style: AppTypography.bodySmall.copyWith(color: theme.textMuted)),
                 ],
               ),
             ),
-            if (selected) const Icon(Icons.check_circle_rounded, size: 18, color: AppColors.primary),
+            if (selected) Icon(Icons.check_circle_rounded, size: style.iconSize * 0.75, color: theme.primary),
           ],
         ),
       ),

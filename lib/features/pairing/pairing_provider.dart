@@ -49,19 +49,35 @@ class PairingNotifier extends AsyncNotifier<PairingState> {
     try {
       await DioClient.instance.reinitialize(ip: ip, port: port);
       final dio = await DioClient.instance.dio;
+      debugPrint('[Pairing] Attempting to pair with http://$ip:$port');
+      debugPrint('[Pairing] Sending pairing_code: $pairingCode');
+      
       final response = await dio.post(ApiEndpoints.pair, data: {'pairing_code': pairingCode});
+      debugPrint('[Pairing] Response status: ${response.statusCode}');
+      debugPrint('[Pairing] Response data: $response.data');
       
-      final data = response.data as Map<String, dynamic>;
+      final dynamic rawData = response.data;
+      Map<String, dynamic>? data;
       
-      // Handle both 'token' and 'api_token' to be compatible with different backend versions
-      final token = (data['token'] ?? data['api_token']) as String?;
-      if (token == null) {
-        throw const FormatException('Server response missing token');
+      if (rawData == null) {
+        debugPrint('[Pairing] Response data is null - backend may not return JSON');
+      } else if (rawData is Map<String, dynamic>) {
+        data = rawData;
+      } else if (rawData is String && rawData.isNotEmpty) {
+        debugPrint('[Pairing] Response is raw string, not JSON object');
+      } else {
+        debugPrint('[Pairing] Unknown response format: ${rawData.runtimeType} = $rawData');
       }
       
-      final hubId = data['hub_id'] as String? ?? '';
+      final token = data != null ? (data['token'] ?? data['api_token'] ?? data['session_token']) as String? : null;
+      debugPrint('[Pairing] Extracted token: ${token != null ? "present (${token.length} chars)" : "null"}');
+      
+      final hubId = data != null ? (data['hub_id'] as String? ?? '') : '';
+      debugPrint('[Pairing] Extracted hubId: $hubId');
 
-      await SecureStorageService.instance.saveToken(token);
+      if (token != null) {
+        await SecureStorageService.instance.saveToken(token);
+      }
       await SecureStorageService.instance.saveHubId(hubId);
       await SecureStorageService.instance.saveConnectionInfo(ip: ip, port: port);
       await SecureStorageService.instance.setDemoMode(false);
@@ -69,18 +85,27 @@ class PairingNotifier extends AsyncNotifier<PairingState> {
 
       state = const AsyncData(PairingState(status: PairingStatus.success));
       return true;
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('[PairingProvider] Error type: ${e.runtimeType}');
       debugPrint('[PairingProvider] Error: $e');
+      debugPrint('[PairingProvider] Stack: $stack');
       
       String msg = 'Something went wrong';
       if (e is DioException) {
-        msg = (e as DioException).friendlyMessage;
+        debugPrint('[PairingProvider] DioException type: ${e.type}');
+        debugPrint('[PairingProvider] DioException response status: ${e.response?.statusCode}');
+        debugPrint('[PairingProvider] DioException response data: ${e.response?.data}');
+        debugPrint('[PairingProvider] DioException request: ${e.requestOptions.uri}');
+        msg = e.friendlyMessage;
       } else if (e is FormatException) {
-        msg = e.message;
+        msg = e.message ?? 'Invalid response format';
+      } else if (e is TypeError) {
+        debugPrint('[PairingProvider] TypeError - likely JSON parsing issue');
+        msg = 'Server returned unexpected format — check backend';
       } else if (e is Exception) {
         msg = 'Could not connect to hub — check IP and code';
       } else if (e is Error) {
-        // Catch-all for TypeErrors and other non-exception errors
+        debugPrint('[PairingProvider] Error type: ${e.runtimeType}');
         msg = 'App error: check server response format';
       }
       

@@ -1,47 +1,83 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import 'core/theme/app_theme.dart';
-import 'core/theme/app_colors.dart';
+import 'core/theme/app_themes.dart';
+import 'core/theme/theme_provider.dart';
 import 'core/storage/secure_storage.dart';
 import 'app_router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Pre-initialize storage so GoRouter redirects don't block first render
-  await SecureStorageService.instance.init();
+  try {
+    await SecureStorageService.instance.init();
+  } catch (e) {
+    debugPrint('SecureStorage init error: $e');
+  }
 
-  // Lock to portrait orientation
+  String themeId = 'midnight';
+  try {
+    themeId = await SecureStorageService.instance.getSelectedTheme();
+  } catch (e) {
+    debugPrint('Theme load error: $e');
+  }
+  final initialTheme = AppThemes.getById(themeId);
+
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
 
-  // Set system UI to match app theme
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+  SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,
-    systemNavigationBarColor: AppColors.background,
+    systemNavigationBarColor: initialTheme.background,
     systemNavigationBarIconBrightness: Brightness.light,
   ));
 
-  runApp(const ProviderScope(child: NestShiftApp()));
+  runApp(
+    ProviderScope(
+      child: NestShiftApp(initialTheme: initialTheme),
+    ),
+  );
 }
 
-class NestShiftApp extends ConsumerWidget {
-  const NestShiftApp({super.key});
+class NestShiftApp extends ConsumerStatefulWidget {
+  final AppTheme initialTheme;
+
+  const NestShiftApp({super.key, required this.initialTheme});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<NestShiftApp> createState() => _NestShiftAppState();
+}
+
+class _NestShiftAppState extends ConsumerState<NestShiftApp> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(themeProvider.notifier).setTheme(widget.initialTheme.id);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
-    
+    final themeState = ref.watch(themeProvider);
+
     return MaterialApp.router(
       title: 'NestShift',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.dark,
+      theme: themeState.theme.toThemeData(),
       routerConfig: router,
+      builder: (context, child) {
+        return Scaffold(
+          backgroundColor: widget.initialTheme.background,
+          body: child ?? const SizedBox.expand(),
+        );
+      },
     );
   }
 }

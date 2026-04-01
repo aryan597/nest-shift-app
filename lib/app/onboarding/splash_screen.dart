@@ -38,7 +38,15 @@ class _SplashScreenState extends State<SplashScreen> {
       if (!mounted) return;
 
       if (isOnboardingComplete) {
-        context.go('/onboarding/login');
+        // Check if user has a token or is in demo mode - go to dashboard
+        final token = await SecureStorageService.instance.getToken();
+        final isDemoMode = await SecureStorageService.instance.isDemoMode();
+        
+        if (token != null || isDemoMode) {
+          context.go('/dashboard');
+        } else {
+          context.go('/onboarding/login');
+        }
       } else {
         context.go('/onboarding/welcome');
       }

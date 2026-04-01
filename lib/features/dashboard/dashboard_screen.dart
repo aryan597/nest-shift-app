@@ -2,22 +2,16 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
-import '../../core/storage/secure_storage.dart';
-import '../../shared/widgets/status_chip.dart';
-import '../../shared/widgets/connection_banner.dart';
-import '../../shared/widgets/nest_panel.dart';
-import '../../shared/widgets/glass_panel.dart';
-import '../../shared/widgets/floating_nav_bar.dart';
+import '../../core/theme/app_themes.dart';
+import '../../core/theme/theme_provider.dart';
 import '../dashboard/dashboard_provider.dart';
-import '../dashboard/brain_status_provider.dart';
+import '../hub/hub_provider.dart';
 import '../hub/hub_screen.dart';
 import '../assistant/assistant_screen.dart';
 import '../automations/automations_screen.dart';
 import '../settings/settings_screen.dart';
-import '../notifications/notifications_screen.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -69,9 +63,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final connectionAsync = ref.watch(connectionProvider);
-    final brainAsync = ref.watch(brainStatusProvider);
     final isConnected = connectionAsync.value?.isConnected ?? false;
-    final brainOnline = brainAsync.value?.isOnline ?? false;
 
     // Screens moved to local list to support instance-specific logic or refreshes
     final screens = [
@@ -151,8 +143,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  // Online Status
-                  _ConnectionIndicator(isConnected: isConnected),
+                  // Connection indicator (no text)
+                  _ConnectionDot(isConnected: isConnected),
                 ],
               ),
             ),
@@ -175,39 +167,23 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 }
 
-class _ConnectionIndicator extends StatelessWidget {
+class _ConnectionDot extends StatelessWidget {
   final bool isConnected;
-  const _ConnectionIndicator({required this.isConnected});
+  const _ConnectionDot({required this.isConnected});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      width: 10,
+      height: 10,
       decoration: BoxDecoration(
-        color: isConnected ? AppColors.success.withValues(alpha: 0.1) : AppColors.warning.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: isConnected ? AppColors.success.withValues(alpha: 0.2) : AppColors.warning.withValues(alpha: 0.2)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 6, height: 6,
-            decoration: BoxDecoration(
-              color: isConnected ? AppColors.success : AppColors.warning,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(color: (isConnected ? AppColors.success : AppColors.warning).withValues(alpha: 0.5), blurRadius: 4, spreadRadius: 1),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            isConnected ? 'Online' : 'Offline',
-            style: AppTypography.labelSmall.copyWith(
-              color: isConnected ? AppColors.success : AppColors.warning,
-              fontWeight: FontWeight.w700,
-            ),
+        color: isConnected ? AppColors.success : AppColors.warning,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: (isConnected ? AppColors.success : AppColors.warning).withValues(alpha: 0.6),
+            blurRadius: 6,
+            spreadRadius: 2,
           ),
         ],
       ),
@@ -306,10 +282,11 @@ class _HomeTab extends ConsumerStatefulWidget {
 }
 
 class _HomeTabState extends ConsumerState<_HomeTab> {
-  bool _aiModeEnabled = false;
-
   @override
   Widget build(BuildContext context) {
+    final hubInfo = ref.watch(hubSystemStatusProvider);
+    final pinsAsync = ref.watch(gpioPinsProvider);
+
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -317,158 +294,78 @@ class _HomeTabState extends ConsumerState<_HomeTab> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 12),
-          // AI Mode Toggle Card
-          GestureDetector(
-            onTap: () {
-              setState(() => _aiModeEnabled = !_aiModeEnabled);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(_aiModeEnabled ? 'AI Mode enabled - AI will control your home' : 'AI Mode disabled'),
-                  behavior: SnackBarBehavior.floating,
+          // ─── Hub Card (simple, no stats) ────────────────────────────
+          hubInfo.when(
+            data: (h) => _HubCardSimple(hub: h),
+            loading: () => _HubCardLoading(),
+            error: (_, __) => const SizedBox(),
+          ),
+          const SizedBox(height: 28),
+          // ─── GPIO Pins Section ────────────────────────────────────────
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('GPIO PINS', style: AppTypography.labelLarge.copyWith(color: AppColors.textSecondary, letterSpacing: 1.5)),
+              TextButton(
+                onPressed: () => widget.onTabChange(1),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.add_circle_outline, size: 16, color: AppColors.primary),
+                    const SizedBox(width: 4),
+                    Text('Add', style: AppTypography.labelSmall.copyWith(color: AppColors.primary)),
+                  ],
                 ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          pinsAsync.when(
+            data: (pins) {
+              if (pins.isEmpty) {
+                return _EmptyPinsCard(onConfigure: () => widget.onTabChange(1));
+              }
+              return Column(
+                children: pins.map((pin) => _PinCard(
+                  pin: pin,
+                  onToggle: () async {
+                    final newState = !(pin.state ?? false);
+                    await ref.read(gpioPinsProvider.notifier).togglePin(pin.pin, newState);
+                  },
+                )).toList(),
               );
             },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: _aiModeEnabled
-                    ? LinearGradient(
-                        colors: [AppColors.primary.withValues(alpha: 0.3), AppColors.accent.withValues(alpha: 0.3)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      )
-                    : null,
-                color: _aiModeEnabled ? null : AppColors.surface,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: _aiModeEnabled ? AppColors.primary : AppColors.border,
-                  width: _aiModeEnabled ? 2 : 1,
-                ),
-                boxShadow: _aiModeEnabled
-                    ? [
-                        BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.3),
-                          blurRadius: 20,
-                          spreadRadius: 2,
-                        ),
-                      ]
-                    : null,
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: _aiModeEnabled ? AppColors.primary : AppColors.textMuted.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Icon(
-                      Icons.psychology_rounded,
-                      color: _aiModeEnabled ? Colors.white : AppColors.textMuted,
-                      size: 28,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'AI Control',
-                          style: AppTypography.displaySmall,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _aiModeEnabled ? 'AI is managing your home' : 'Enable AI to automate your home',
-                          style: AppTypography.bodySmall,
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    width: 52,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      color: _aiModeEnabled ? AppColors.primary : AppColors.textMuted.withValues(alpha: 0.3),
-                    ),
-                    child: AnimatedAlign(
-                      duration: const Duration(milliseconds: 200),
-                      alignment: _aiModeEnabled ? Alignment.centerRight : Alignment.centerLeft,
-                      child: Container(
-                        width: 28,
-                        height: 28,
-                        margin: const EdgeInsets.all(2),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          _aiModeEnabled ? Icons.check : Icons.close,
-                          size: 16,
-                          color: _aiModeEnabled ? AppColors.primary : AppColors.textMuted,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+            loading: () => Container(
+              height: 120,
+              alignment: Alignment.center,
+              child: const CircularProgressIndicator(),
+            ),
+            error: (e, _) => _ErrorCard(
+              message: 'Failed to load pins',
+              onRetry: () => ref.invalidate(gpioPinsProvider),
             ),
           ),
-          const SizedBox(height: 24),
-          // Quick Stats Row
-          Row(
-            children: [
-              Expanded(child: _StatCard(icon: Icons.developer_board_rounded, label: 'Devices', value: '4', color: AppColors.primary)),
-              const SizedBox(width: 12),
-              Expanded(child: _StatCard(icon: Icons.sensors, label: 'Sensors', value: '2', color: AppColors.success)),
-              const SizedBox(width: 12),
-              Expanded(child: _StatCard(icon: Icons.auto_awesome, label: 'Flows', value: '2', color: AppColors.accent)),
-            ],
+          const SizedBox(height: 28),
+          // ─── Quick Actions ────────────────────────────────────────────
+          Text('QUICK ACTIONS', style: AppTypography.labelLarge.copyWith(color: AppColors.textSecondary, letterSpacing: 1.5)),
+          const SizedBox(height: 12),
+          _QuickActionTile(
+            icon: Icons.settings_ethernet_rounded,
+            title: 'Configure Pins',
+            subtitle: 'Manage GPIO configuration',
+            onTap: () => widget.onTabChange(1),
           ),
-          const SizedBox(height: 32),
-          Text('Quick Controls', style: AppTypography.labelLarge.copyWith(color: AppColors.textSecondary, letterSpacing: 1.5)),
-          const SizedBox(height: 16),
-          // Grid layout
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 16,
-            crossAxisSpacing: 16,
-            childAspectRatio: 1.1,
-            children: [
-              _QuickActionCard(
-                icon: Icons.developer_board_rounded,
-                label: 'Devices',
-                sublabel: '4 online',
-                color: AppColors.primary,
-                onTap: () => widget.onTabChange(1),
-              ),
-              _QuickActionCard(
-                icon: Icons.psychology_rounded,
-                label: 'Assistant',
-                sublabel: 'Voice ready',
-                color: AppColors.accent,
-                onTap: () => widget.onTabChange(2),
-              ),
-              _QuickActionCard(
-                icon: Icons.auto_awesome_rounded,
-                label: 'Flows',
-                sublabel: '2 active',
-                color: AppColors.success,
-                onTap: () => widget.onTabChange(3),
-              ),
-              _QuickActionCard(
-                icon: Icons.insights_rounded,
-                label: 'Insights',
-                sublabel: 'View reports',
-                color: const Color(0xFFFFB830),
-                onTap: () => GoRouter.of(context).push('/insights'),
-              ),
-            ],
+          _QuickActionTile(
+            icon: Icons.psychology_rounded,
+            title: 'AI Assistant',
+            subtitle: 'Control with voice commands',
+            onTap: () => widget.onTabChange(2),
+          ),
+          _QuickActionTile(
+            icon: Icons.power_settings_new_rounded,
+            title: 'Hub Management',
+            subtitle: 'Reboot & restart services',
+            onTap: () => widget.onTabChange(4),
           ),
           const SizedBox(height: 40),
         ],
@@ -477,65 +374,230 @@ class _HomeTabState extends ConsumerState<_HomeTab> {
   }
 }
 
-class _StatCard extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
-
-  const _StatCard({required this.icon, required this.label, required this.value, required this.color});
+class _HubCardSimple extends ConsumerWidget {
+  final HubSystemInfo hub;
+  const _HubCardSimple({required this.hub});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeState = ref.watch(themeProvider);
+    final theme = themeState.theme;
+    final style = theme.style;
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(style.cardRadius * 1.5),
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        gradient: LinearGradient(
+          colors: [
+            theme.primary.withValues(alpha: 0.12),
+            theme.accent.withValues(alpha: 0.08),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(style.cardRadius * 1.5),
+        border: Border.all(color: theme.primary.withValues(alpha: 0.2)),
+        boxShadow: style.hasGlow ? [
+          BoxShadow(color: theme.primary.withValues(alpha: style.glowIntensity * 0.15), blurRadius: 20, spreadRadius: 0),
+        ] : null,
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 8),
-          Text(value, style: AppTypography.displaySmall.copyWith(color: color)),
-          Text(label, style: AppTypography.labelSmall),
+          Row(
+            children: [
+              Container(
+                width: style.cardRadius * 4,
+                height: style.cardRadius * 4,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: theme.gradient, begin: Alignment.topLeft, end: Alignment.bottomRight),
+                  borderRadius: BorderRadius.circular(style.cardRadius),
+                  boxShadow: [
+                    BoxShadow(color: theme.primary.withValues(alpha: 0.3), blurRadius: 8, spreadRadius: 0),
+                  ],
+                ),
+                child: Stack(
+                  children: [
+                    Center(child: Icon(Icons.hub_rounded, color: Colors.white, size: style.iconSize + 6)),
+                    Positioned(
+                      right: 4,
+                      top: 4,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: hub.mqttConnected ? theme.primary : AppColors.warning,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(color: (hub.mqttConnected ? theme.primary : AppColors.warning).withValues(alpha: 0.6), blurRadius: 4, spreadRadius: 1),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(width: style.cardRadius),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(hub.hubName, style: AppTypography.displaySmall.copyWith(color: theme.textPrimary, fontWeight: FontWeight.w800)),
+                    SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: theme.primary.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text('v${hub.version}', style: AppTypography.mono(fontSize: 10, color: theme.primary)),
+                        ),
+                        SizedBox(width: 8),
+                        Icon(Icons.timer_outlined, size: 12, color: theme.textMuted),
+                        SizedBox(width: 4),
+                        Text(hub.uptimeFormatted, style: AppTypography.labelSmall.copyWith(fontSize: 10, color: theme.textMuted)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: style.cardRadius * 1.5),
+          Row(
+            children: [
+              _MiniGauge(
+                value: hub.cpuPercent,
+                max: 100,
+                label: 'CPU',
+                icon: Icons.speed_rounded,
+                color: theme.accent,
+                theme: theme,
+                style: style,
+              ),
+              SizedBox(width: style.cardRadius),
+              _MiniGauge(
+                value: hub.memoryMb.clamp(0, 100),
+                max: 100,
+                label: 'MEM',
+                icon: Icons.memory_rounded,
+                color: theme.primary,
+                theme: theme,
+                style: style,
+                suffix: '${hub.memoryMb.toStringAsFixed(0)}MB',
+              ),
+              SizedBox(width: style.cardRadius),
+              _MiniGauge(
+                value: hub.diskPercent,
+                max: 100,
+                label: 'DISK',
+                icon: Icons.storage_rounded,
+                color: theme.accent,
+                theme: theme,
+                style: style,
+                suffix: '${hub.diskPercent.toStringAsFixed(0)}%',
+              ),
+            ],
+          ),
+          SizedBox(height: style.cardRadius * 1.25),
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: style.cardRadius, vertical: style.cardRadius * 0.75),
+            decoration: BoxDecoration(
+              color: theme.surfaceRaised.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(style.cardRadius),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _StatItem(
+                  icon: Icons.developer_board_rounded,
+                  value: '${hub.deviceCount}',
+                  label: 'Devices',
+                  color: theme.primary,
+                  theme: theme,
+                  style: style,
+                ),
+                Container(width: 1, height: 20, color: theme.border),
+                _StatItem(
+                  icon: Icons.wifi_rounded,
+                  value: '${hub.onlineDeviceCount}',
+                  label: 'Online',
+                  color: theme.primary,
+                  theme: theme,
+                  style: style,
+                ),
+                Container(width: 1, height: 20, color: theme.border),
+                _StatItem(
+                  icon: Icons.auto_awesome_rounded,
+                  value: '${hub.activeAutomations}',
+                  label: 'Flows',
+                  color: theme.accent,
+                  theme: theme,
+                  style: style,
+                ),
+                Container(width: 1, height: 20, color: theme.border),
+                _StatItem(
+                  icon: Icons.schedule_rounded,
+                  value: '${hub.activeSchedules}',
+                  label: 'Sched',
+                  color: theme.accent,
+                  theme: theme,
+                  style: style,
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _QuickActionCard extends StatelessWidget {
-  final IconData icon;
+class _MiniGauge extends StatelessWidget {
+  final double value;
+  final double max;
   final String label;
-  final String sublabel;
+  final IconData icon;
   final Color color;
-  final VoidCallback onTap;
+  final AppTheme theme;
+  final ThemeStyle style;
+  final String? suffix;
 
-  const _QuickActionCard({required this.icon, required this.label, required this.sublabel, required this.color, required this.onTap});
+  const _MiniGauge({required this.value, required this.max, required this.label, required this.icon, required this.color, required this.theme, required this.style, this.suffix});
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: GlassPanel(
-        padding: const EdgeInsets.all(16),
+    final percentage = (value / max).clamp(0.0, 1.0);
+    return Expanded(
+      child: Container(
+        padding: EdgeInsets.all(style.cardRadius * 0.75),
+        decoration: BoxDecoration(
+          color: theme.surfaceRaised.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(style.cardRadius),
+        ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 36, height: 36,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: color, size: 20),
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                SizedBox(
+                  width: style.cardRadius * 2.5,
+                  height: style.cardRadius * 2.5,
+                  child: CircularProgressIndicator(
+                    value: percentage,
+                    strokeWidth: 3,
+                    backgroundColor: color.withValues(alpha: 0.15),
+                    valueColor: AlwaysStoppedAnimation<Color>(color),
+                  ),
+                ),
+                Icon(icon, size: style.iconSize * 0.7, color: color),
+              ],
             ),
-            const Spacer(),
-            Text(label, style: AppTypography.labelLarge.copyWith(fontSize: 14)),
-            const SizedBox(height: 2),
-            Text(sublabel, style: AppTypography.bodySmall.copyWith(fontSize: 11)),
+            SizedBox(height: 4),
+            Text(suffix ?? '${percentage * 100 ~/ 1}%', style: AppTypography.mono(fontSize: 12, fontWeight: FontWeight.w800, color: color)),
+            Text(label, style: AppTypography.labelSmall.copyWith(fontSize: 8, color: theme.textMuted)),
           ],
         ),
       ),
@@ -543,59 +605,463 @@ class _QuickActionCard extends StatelessWidget {
   }
 }
 
-// ─── LIVE STATS STRIP ─────────────────────────────────────────────────────────
+class _StatItem extends StatelessWidget {
+  final IconData icon;
+  final String value;
+  final String label;
+  final Color color;
+  final AppTheme theme;
+  final ThemeStyle style;
 
-class _LiveStatsStrip extends ConsumerWidget {
-  const _LiveStatsStrip();
+  const _StatItem({required this.icon, required this.value, required this.label, required this.color, required this.theme, required this.style});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final devicesAsync = ref.watch(
-      // Simple count from hub provider if loaded, else fallback
-      // Using a simple provider watch here
-      brainStatusProvider,
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Icon(icon, size: style.iconSize * 0.65, color: color),
+        SizedBox(height: 2),
+        Text(value, style: AppTypography.mono(fontSize: 13, fontWeight: FontWeight.w800, color: theme.textPrimary)),
+        Text(label, style: AppTypography.labelSmall.copyWith(fontSize: 8, color: theme.textMuted)),
+      ],
     );
-    final uptime = devicesAsync.value?.uptime ?? '—';
+  }
+}
 
+class _HubCard extends StatelessWidget {
+  final HubSystemInfo hub;
+  const _HubCard({required this.hub});
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      height: 52,
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppColors.border)),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [AppColors.primary.withValues(alpha: 0.15), AppColors.accent.withValues(alpha: 0.1)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _StatTile(value: '3', label: 'Active', color: AppColors.primary),
-          _StatTile(value: '2', label: 'Relays', color: AppColors.success),
-          _StatTile(value: '1', label: 'Rules', color: AppColors.accent),
-          _StatTile(value: uptime, label: 'Uptime', color: AppColors.primary),
+          Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.hub_rounded, color: AppColors.primary, size: 28),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(hub.hubName, style: AppTypography.displaySmall),
+                    Text('v${hub.version} • ${hub.uptimeFormatted}', style: AppTypography.bodySmall),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: hub.mqttConnected 
+                      ? AppColors.success.withValues(alpha: 0.15)
+                      : AppColors.warning.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 8, height: 8,
+                      decoration: BoxDecoration(
+                        color: hub.mqttConnected ? AppColors.success : AppColors.warning,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      hub.mqttConnected ? 'Online' : 'Offline',
+                      style: AppTypography.labelSmall.copyWith(
+                        color: hub.mqttConnected ? AppColors.success : AppColors.warning,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _HubStatChip(
+                icon: Icons.memory_rounded,
+                value: '${hub.memoryMb.toStringAsFixed(1)}MB',
+                label: 'Memory',
+                color: AppColors.accent,
+              ),
+              _HubStatChip(
+                icon: Icons.speed_rounded,
+                value: '${hub.cpuPercent.toStringAsFixed(1)}%',
+                label: 'CPU',
+                color: AppColors.primary,
+              ),
+              _HubStatChip(
+                icon: Icons.storage_rounded,
+                value: '${hub.diskPercent.toStringAsFixed(1)}%',
+                label: 'Disk',
+                color: AppColors.success,
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 }
 
-class _StatTile extends StatelessWidget {
+class _HubStatChip extends StatelessWidget {
+  final IconData icon;
   final String value;
   final String label;
   final Color color;
-  const _StatTile({required this.value, required this.label, required this.color});
+  const _HubStatChip({required this.icon, required this.value, required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Icon(icon, color: color, size: 18),
+        const SizedBox(height: 4),
+        Text(value, style: AppTypography.mono(fontSize: 13, fontWeight: FontWeight.w700, color: color)),
+        Text(label, style: AppTypography.labelSmall.copyWith(fontSize: 9)),
+      ],
+    );
+  }
+}
+
+class _HubCardLoading extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 160,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: const Center(child: CircularProgressIndicator()),
+    );
+  }
+}
+
+class _QuickStatCard extends StatelessWidget {
+  final IconData icon;
+  final String value;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  const _QuickStatCard({required this.icon, required this.value, required this.label, required this.color, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Column(
+            children: [
+              Icon(icon, color: color, size: 20),
+              const SizedBox(height: 6),
+              Text(value, style: AppTypography.mono(fontSize: 14, fontWeight: FontWeight.w700, color: color)),
+              Text(label, style: AppTypography.labelSmall.copyWith(fontSize: 10)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PinCard extends ConsumerWidget {
+  final GpioPin pin;
+  final VoidCallback onToggle;
+  const _PinCard({required this.pin, required this.onToggle});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeState = ref.watch(themeProvider);
+    final theme = themeState.theme;
+    final style = theme.style;
+    final isOn = pin.state ?? false;
+    final pinColor = pin.deviceType == 'relay' ? (isOn ? theme.accent : theme.textMuted) : theme.primary;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: EdgeInsets.all(style.cardRadius + 2),
+      decoration: BoxDecoration(
+        color: _getCardBackground(theme, style, isOn, pinColor),
+        borderRadius: BorderRadius.circular(style.cardRadius),
+        border: style.cardBorderWidth > 0 ? Border.all(
+          color: isOn ? pinColor.withValues(alpha: 0.5) : theme.border,
+          width: style.cardBorderWidth,
+        ) : null,
+        boxShadow: style.hasGlow && isOn ? [
+          BoxShadow(
+            color: pinColor.withValues(alpha: style.glowIntensity * 0.4),
+            blurRadius: 12,
+            spreadRadius: 0,
+          ),
+        ] : null,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: style.iconSize + 16, height: style.iconSize + 16,
+            padding: EdgeInsets.all(style.iconPadding - 8),
+            decoration: BoxDecoration(
+              color: pinColor.withValues(alpha: style.hasGlow ? 0.25 : 0.15),
+              borderRadius: BorderRadius.circular(style.cardRadius - 4),
+              boxShadow: style.hasGlow ? [
+                BoxShadow(
+                  color: pinColor.withValues(alpha: style.glowIntensity * 0.3),
+                  blurRadius: 8,
+                  spreadRadius: 0,
+                ),
+              ] : null,
+            ),
+            child: Icon(
+              pin.deviceType == 'sensor' ? Icons.sensors_rounded : Icons.power_rounded,
+              color: pinColor, size: style.iconSize,
+            ),
+          ),
+          SizedBox(width: style.cardRadius),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(pin.name ?? 'Pin ${pin.pin}', style: AppTypography.labelLarge.copyWith(color: theme.textPrimary, fontSize: 14)),
+                Text('GPIO ${pin.pin} • ${pin.deviceType ?? 'relay'}', style: AppTypography.bodySmall.copyWith(color: theme.textSecondary)),
+              ],
+            ),
+          ),
+          if (pin.deviceType == 'relay')
+            GestureDetector(
+              onTap: onToggle,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: style.cardRadius * 3.5, height: style.cardRadius * 2,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(style.cardRadius),
+                  color: isOn ? theme.accent : theme.surfaceRaised,
+                  border: Border.all(color: isOn ? theme.accent : theme.border),
+                  boxShadow: style.hasGlow && isOn ? [
+                    BoxShadow(
+                      color: theme.accent.withValues(alpha: style.glowIntensity * 0.5),
+                      blurRadius: 8,
+                      spreadRadius: 0,
+                    ),
+                  ] : null,
+                ),
+                child: AnimatedAlign(
+                  duration: const Duration(milliseconds: 200),
+                  alignment: isOn ? Alignment.centerRight : Alignment.centerLeft,
+                  child: Container(
+                    width: style.cardRadius * 1.75 - 4, height: style.cardRadius * 2 - 4,
+                    margin: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: isOn ? Colors.white : theme.textMuted,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      isOn ? Icons.power_rounded : Icons.power_off_rounded,
+                      size: style.iconSize - 8, color: isOn ? theme.accent : Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            )
+          else
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: style.cardRadius * 0.7, vertical: style.cardRadius * 0.3),
+              decoration: BoxDecoration(
+                color: theme.primary.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(style.cardRadius * 0.5),
+              ),
+              child: Text('Sensor', style: AppTypography.labelSmall.copyWith(color: theme.primary)),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Color _getCardBackground(AppTheme theme, ThemeStyle style, bool isOn, Color pinColor) {
+    if (style.hasGradientOverlay && isOn) {
+      return theme.surface.withValues(alpha: 0.9);
+    }
+    return style.cardStyle == CardStyle.flat 
+        ? theme.surface 
+        : theme.surface.withValues(alpha: style.cardStyle == CardStyle.glass ? 0.7 : 1.0);
+  }
+}
+
+class _EmptyPinsCard extends ConsumerWidget {
+  final VoidCallback onConfigure;
+  const _EmptyPinsCard({required this.onConfigure});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeState = ref.watch(themeProvider);
+    final theme = themeState.theme;
+    final style = theme.style;
+
+    return GestureDetector(
+      onTap: onConfigure,
+      child: Container(
+        padding: EdgeInsets.all(style.cardRadius + 10),
+        decoration: BoxDecoration(
+          color: theme.surface.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(style.cardRadius),
+          border: style.cardBorderWidth > 0 ? Border.all(color: theme.border) : null,
+        ),
+        child: Column(
+          children: [
+            Icon(Icons.add_circle_outline_rounded, color: theme.textMuted, size: style.iconSize + 16),
+            SizedBox(height: style.cardRadius * 0.75),
+            Text('No Pins Configured', style: AppTypography.labelLarge.copyWith(color: theme.textPrimary)),
+            SizedBox(height: style.cardRadius * 0.25),
+            Text('Tap to add GPIO pins', style: AppTypography.bodySmall.copyWith(color: theme.textSecondary)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickActionTile extends ConsumerWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  const _QuickActionTile({required this.icon, required this.title, required this.subtitle, required this.onTap});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeState = ref.watch(themeProvider);
+    final theme = themeState.theme;
+    final style = theme.style;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: EdgeInsets.only(bottom: style.cardRadius * 0.7),
+        padding: EdgeInsets.all(style.cardRadius),
+        decoration: BoxDecoration(
+          color: theme.surface,
+          borderRadius: BorderRadius.circular(style.cardRadius),
+          border: style.cardBorderWidth > 0 ? Border.all(color: theme.border) : null,
+          boxShadow: style.hasGlow ? [
+            BoxShadow(color: theme.primary.withValues(alpha: style.glowIntensity * 0.2), blurRadius: 8, spreadRadius: 0),
+          ] : null,
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: style.cardRadius * 3, height: style.cardRadius * 3,
+              padding: EdgeInsets.all(style.iconPadding - 4),
+              decoration: BoxDecoration(
+                color: theme.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(style.cardRadius * 0.75),
+              ),
+              child: Icon(icon, color: theme.primary, size: style.iconSize - 2),
+            ),
+            SizedBox(width: style.cardRadius),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: AppTypography.labelLarge.copyWith(color: theme.textPrimary)),
+                  Text(subtitle, style: AppTypography.bodySmall.copyWith(color: theme.textSecondary)),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, color: theme.textMuted, size: style.iconSize),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatTile extends StatelessWidget {
+  final IconData icon;
+  final String value;
+  final String label;
+  final Color color;
+  const _StatTile({required this.icon, required this.value, required this.label, required this.color});
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
       child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
-          border: Border(right: BorderSide(color: AppColors.border)),
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
         ),
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(value, style: AppTypography.mono(fontSize: 16, fontWeight: FontWeight.w700, color: color)),
-              Text(label, style: AppTypography.exo(fontSize: 9, color: AppColors.textMuted, letterSpacing: 0.5)),
-            ],
-          ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 18),
+            const SizedBox(height: 6),
+            Text(value, style: AppTypography.mono(fontSize: 13, fontWeight: FontWeight.w700, color: color)),
+            Text(label, style: AppTypography.labelSmall.copyWith(fontSize: 9, color: AppColors.textMuted)),
+          ],
         ),
+      ),
+    );
+  }
+}
+
+class _ErrorCard extends ConsumerWidget {
+  final String message;
+  final VoidCallback onRetry;
+  const _ErrorCard({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeState = ref.watch(themeProvider);
+    final theme = themeState.theme;
+    final style = theme.style;
+
+    return Container(
+      padding: EdgeInsets.all(style.cardRadius),
+      decoration: BoxDecoration(
+        color: AppColors.error.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(style.cardRadius),
+        border: style.cardBorderWidth > 0 ? Border.all(color: AppColors.error.withValues(alpha: 0.3)) : null,
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.error_outline, color: AppColors.error, size: style.iconSize),
+          SizedBox(width: style.cardRadius * 0.75),
+          Expanded(child: Text(message, style: AppTypography.bodySmall.copyWith(color: theme.textPrimary))),
+          TextButton(onPressed: onRetry, child: Text('Retry', style: TextStyle(color: AppColors.error))),
+        ],
       ),
     );
   }

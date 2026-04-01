@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SecureStorageService {
@@ -10,6 +11,9 @@ class SecureStorageService {
   static const _portKey = 'nestshift_port';
   static const _demoModeKey = 'nestshift_demo_mode';
   static const _onboardingCompleteKey = 'nestshift_onboarding_complete';
+  static const _userProfileKey = 'nestshift_user_profile';
+  static const _themeModeKey = 'nestshift_theme_mode';
+  static const _selectedThemeKey = 'nestshift_selected_theme';
 
   late SharedPreferences _prefs;
   bool _initialized = false;
@@ -25,13 +29,22 @@ class SecureStorageService {
   }
 
   // Token
-  Future<void> saveToken(String token) async {
+  Future<void> saveToken(String? token) async {
     await _ensureInitialized();
-    await _prefs.setString(_tokenKey, token);
+    if (token != null) {
+      await _prefs.setString(_tokenKey, token);
+    } else {
+      await _prefs.remove(_tokenKey);
+    }
   }
   
   Future<String?> getToken() async {
     await _ensureInitialized();
+    return _prefs.getString(_tokenKey);
+  }
+  
+  String? getTokenSync() {
+    if (!_initialized) return null;
     return _prefs.getString(_tokenKey);
   }
   
@@ -98,6 +111,45 @@ class SecureStorageService {
     await _ensureInitialized();
     final val = _prefs.getString(_onboardingCompleteKey);
     return val == 'true';
+  }
+
+  // User Profile
+  Future<void> saveUserProfile(Map<String, dynamic> profile) async {
+    await _ensureInitialized();
+    await _prefs.setString(_userProfileKey, jsonEncode(profile));
+  }
+  
+  Future<Map<String, dynamic>?> getUserProfile() async {
+    await _ensureInitialized();
+    final json = _prefs.getString(_userProfileKey);
+    if (json == null) return null;
+    return jsonDecode(json) as Map<String, dynamic>;
+  }
+  
+  Future<void> clearUserProfile() async {
+    await _ensureInitialized();
+    await _prefs.remove(_userProfileKey);
+  }
+
+  // Theme
+  Future<void> setThemeMode(String mode) async {
+    await _ensureInitialized();
+    await _prefs.setString(_themeModeKey, mode);
+  }
+  
+  Future<String> getThemeMode() async {
+    await _ensureInitialized();
+    return _prefs.getString(_themeModeKey) ?? 'dark';
+  }
+
+  Future<void> setSelectedTheme(String themeId) async {
+    await _ensureInitialized();
+    await _prefs.setString(_selectedThemeKey, themeId);
+  }
+  
+  Future<String> getSelectedTheme() async {
+    await _ensureInitialized();
+    return _prefs.getString(_selectedThemeKey) ?? 'midnight';
   }
 
   // Clear all

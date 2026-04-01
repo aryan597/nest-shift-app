@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../core/network/dio_client.dart';
@@ -10,24 +11,51 @@ class AutomationsNotifier extends AsyncNotifier<List<Automation>> {
 
   @override
   Future<List<Automation>> build() async {
+    debugPrint('[Automations] build() called');
     final isDemoMode = await SecureStorageService.instance.isDemoMode();
-    if (isDemoMode) return demoAutomations();
+    if (isDemoMode) {
+      debugPrint('[Automations] Demo mode - returning demo data');
+      return demoAutomations();
+    }
 
     try {
       final dio = await DioClient.instance.dio;
+      debugPrint('[Automations] Fetching from API...');
       final response = await dio.get(ApiEndpoints.automations).timeout(const Duration(seconds: 8));
+      debugPrint('[Automations] Got response: ${response.statusCode}');
       final list = response.data as List<dynamic>;
+      debugPrint('[Automations] Parsed ${list.length} automations');
       return list.map((e) => Automation.fromJson(e as Map<String, dynamic>)).toList();
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('[Automations] Error: $e');
+      debugPrint('[Automations] Stack: $stack');
       throw 'Automations unavailable. Check hub connection.';
     }
   }
 
-  // The _fetch method is removed as its logic is now directly in build().
-  // The refresh method needs to be updated to reflect this change.
+  Future<List<Automation>> _fetch() async {
+    debugPrint('[Automations] _fetch() called');
+    final isDemoMode = await SecureStorageService.instance.isDemoMode();
+    if (isDemoMode) {
+      debugPrint('[Automations] Demo mode - returning demo data');
+      return demoAutomations();
+    }
+
+    final dio = await DioClient.instance.dio;
+    debugPrint('[Automations] Fetching from API...');
+    final response = await dio.get(ApiEndpoints.automations).timeout(const Duration(seconds: 8));
+    debugPrint('[Automations] Got response: ${response.statusCode}');
+    final list = response.data as List<dynamic>;
+    return list.map((e) => Automation.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
   Future<void> refresh() async {
+    debugPrint('[Automations] refresh() called');
     state = const AsyncLoading();
-    state = await AsyncValue.guard(build); // Call build() directly to re-fetch
+    debugPrint('[Automations] State set to loading');
+    final result = await AsyncValue.guard(_fetch);
+    debugPrint('[Automations] Fetch result: ${result}');
+    state = result;
   }
 
   Future<void> toggle(String id) async {
@@ -58,7 +86,8 @@ class AutomationsNotifier extends AsyncNotifier<List<Automation>> {
   Future<void> create({
     required String name,
     required AutomationTrigger trigger,
-    required AutomationAction action,
+    required List<AutomationAction> actions,
+    String? description,
   }) async {
     final isDemoMode = await SecureStorageService.instance.isDemoMode();
     late Automation newAutomation;
@@ -67,16 +96,20 @@ class AutomationsNotifier extends AsyncNotifier<List<Automation>> {
       newAutomation = Automation(
         id: _uuid.v4(),
         name: name,
+        description: description,
         trigger: trigger,
-        action: action,
+        actions: actions,
         enabled: false,
       );
     } else {
       final dio = await DioClient.instance.dio;
       final response = await dio.post(ApiEndpoints.automations, data: {
         'name': name,
-        'trigger': trigger.toJson(),
-        'action': action.toJson(),
+        'description': description ?? '',
+        'trigger_type': trigger.type,
+        'trigger_config': trigger.config,
+        'actions': actions.map((a) => a.toJson()).toList(),
+        'enabled': false,
       });
       newAutomation = Automation.fromJson(response.data as Map<String, dynamic>);
     }
@@ -91,7 +124,7 @@ class AutomationsNotifier extends AsyncNotifier<List<Automation>> {
       final isDemoMode = await SecureStorageService.instance.isDemoMode();
       if (!isDemoMode) {
         final dio = await DioClient.instance.dio;
-        await dio.delete(ApiEndpoints.automationById(id));
+        await dio.delete(ApiEndpoints.automation(id));
       }
       state = AsyncData(current.where((a) => a.id != id).toList());
     } catch (_) {
